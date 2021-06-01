@@ -1,0 +1,5 @@
+; comment
+(define var 1)
+(define (fn n m) (+ m n))
+(define (id e) e)
+"string"

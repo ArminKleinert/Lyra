@@ -56,6 +56,16 @@ class Cons
       @cdr.nthrest(i-1)
     end
   end
+  
+  def to_a
+    rest = @cdr
+    result = [@car]
+    while rest.is_a?(Cons)
+      result << rest.car
+      rest = rest.cdr
+    end
+    result
+  end
 end
 
 def list_to_s_helper(cons)
@@ -249,6 +259,8 @@ end
 def pairs(cons0, cons1)
   if cons0.nil? || cons1.nil?
     nil
+  elsif cons0.cdr.nil? && !(cons1.cdr.nil?)
+    Cons.new(Cons.new(cons0.car, cons1), nil)
   else
     Cons.new(Cons.new(cons0.car, cons1.car), pairs(cons0.cdr, cons1.cdr))
   end
@@ -316,14 +328,9 @@ def evdefine(expr, env, ismacro)
     name = expr.first.first
     args_expr = expr.first.rest
     body = expr.rest
-    #if ismacro
-    #  res = LyraFn.new(name, true, list_len(args_expr)) do |args, environment|
-    #    env1 = append(pairs(args_expr, args), environment)
-    #    eval_keep_last(body, env1)
-    #  end
-    #else
-      res = evlambda(args_expr, body, ismacro)
-    #end
+
+    res = evlambda(args_expr, body, ismacro)
+
     res.name = name
   else
     # Form is `(define .. ...)` (Variable definition)
@@ -336,11 +343,39 @@ def evdefine(expr, env, ismacro)
   res
 end
 
+def last2(c)
+  if c.nil?
+    Cons.new(nil,nil)
+  elsif c.cdr.nil?
+    c
+  elsif c.cdr.cdr.nil?
+    c
+  else
+    last2(c.cdr)
+  end
+end
+
 # args_expr has the format `(args...)`
 # body_expr has the format `expr...`
 def evlambda(args_expr, body_expr, ismacro = false)
-  arg_count = list_len(args_expr)
-  LyraFn.new("", ismacro, arg_count) do |args, environment|
+  arg_arr = args_expr.to_a
+  arg_count = arg_arr.size
+  max_args = arg_count
+
+  if arg_count >= 2
+
+    varargs = arg_arr[-2] == :"&"
+    if varargs
+      last = arg_arr[-1]
+      arg_arr = arg_arr[0 .. -3]
+      arg_arr << last
+      args_expr = list(*arg_arr)
+      max_args = -1
+      arg_count -= 1
+    end
+  end
+
+  LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
     env1 = append(pairs(args_expr, args), environment)
     eval_keep_last(body_expr, env1)
   end
@@ -393,6 +428,6 @@ def eval_ly(expr, env)
   end
 end
 
-puts make_ast(tokenize("; comment\n(bla)"))
-
-evalstr(IO.read(ARGV[0]))
+if ARGV.size > 0
+  evalstr(IO.read(ARGV[0]))
+end

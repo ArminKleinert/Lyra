@@ -104,8 +104,6 @@ ENV      | Global environment.
 
 ## Missing features:
 
-Variadic arguments.
-
 Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.
 
 `import/require/load` command. This can probably be implemented as `(eval! (parse (slurp! file)))`, but I need to try.

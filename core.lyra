@@ -48,11 +48,13 @@
       (cons (car xs) (filter f (cdr xs)))
       (filter f (cdr xs)))))
 
+(def-macro (comment & e)
+  )
 
 (println! 15)
 (println! (load! "example.lyra"))
 
-
+(comment Ignore this!)
 
 
 

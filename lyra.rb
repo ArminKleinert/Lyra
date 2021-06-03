@@ -93,6 +93,8 @@ puts elem_to_s(ast)
 puts
 =end
 
+# Turns 2 lists into a combined one.
+# pairs(list(1,2,3), list(4,5,6)) => ((1 . 4) (2 . 5) (3 . 6))
 def pairs(cons0, cons1)
   if cons0.nil? || cons1.nil?
     nil
@@ -101,20 +103,24 @@ def pairs(cons0, cons1)
   end
 end
 
+# Check atoms for equality
 def eq?(x, y)
   x == y
 end
 
+# Search environment for symbol
 def associated(x, env)
-  if eq?(env.car.car, x)
+  if env.nil?
+    raise "Symbol not found: #{elem_to_s(x)}"
+  elsif eq?(env.car.car, x)
     env.car.cdr
-  #elsif env.cdr.nil?
-  #  nil
   else
     associated(x, env.cdr)
   end
 end
 
+# Append two lists
+# Complexity depends on the first list
 def append(c0, c1)
   if c0.nil?
     c1
@@ -123,6 +129,8 @@ def append(c0, c1)
   end
 end
 
+# Takes a Cons (list of expressions), calls eval_ly on each element
+# and return a new list
 def eval_list(expr_list, env)
   if expr_list.nil?
     nil
@@ -131,15 +139,8 @@ def eval_list(expr_list, env)
   end
 end
 
+# Similar to eval_list, but only returns the last evaluated value
 def eval_keep_last(expr_list, env)
-=begin
-  temp = nil
-  until expr_list.nil?
-    temp = eval_ly(expr_list.car, env)
-    expr_list = expr_list.cdr
-  end
-  temp
-=end
   if expr_list.nil?
     nil
   elsif expr_list.cdr.nil?
@@ -150,6 +151,7 @@ def eval_keep_last(expr_list, env)
   end
 end
 
+# Evaluation function
 def eval_ly(expr, env)
   if expr.nil?
     nil # nil evaluates to nil
@@ -171,12 +173,16 @@ def eval_ly(expr, env)
         eval_keep_last(body_expr, env1)
       end
     when :define
-      # ...
+      # TODO
     when :"let*"
       name = expr.cdr.car.car
       val = eval_ly(expr.cdr.car.cdr.car, env)
       env1 = Cons.new(Cons.new(name, val), env)
       eval_keep_last(expr.cdr.cdr, env1)
+    when :quote
+      # TODO
+    when :"def-macro"
+      # TODO
     else
       # Find value of symbol in env and call it as a function
       eval_ly(expr.car, env).call(expr.cdr, env)

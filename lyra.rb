@@ -159,11 +159,13 @@ class LyraFn < Proc
   attr_reader :arg_counts
   attr_reader :body
   attr_accessor :name
+  attr_reader :ismacro
   
-  def initialize(name, min_args, max_args=min_args, &body)
+  def initialize(name, ismacro, min_args, max_args=min_args, &body)
     @arg_counts = (min_args .. max_args)
     @body = body
     @name = name
+    @ismacro = ismacro
   end
   
   def call(args, env)
@@ -175,38 +177,44 @@ class LyraFn < Proc
   end
   
   def to_s
-    "<function #{name}>"
+    "<#{@ismacro ? "macro" : "function"} #{name}>"
   end
 end
 
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
-    entry = Cons.new(name, LyraFn.new(name, min_args, max_args, &body))
+    entry = Cons.new(name, LyraFn.new(name, false, min_args, max_args, &body))
     ENV.cdr = Cons.new(entry , ENV.cdr)
   end
   
-  add_fn(:"+", 1, 2) {|args, env| 0 + eval_ly(args.car, env) + eval_ly(args.second, env) }
-  add_fn(:"-", 2) {|args, env| eval_ly(args.car, env) - eval_ly(args.second, env) }
-  add_fn(:"*", 2) {|args, env| eval_ly(args.car, env) * eval_ly(args.second, env) }
-  add_fn(:"/", 2) {|args, env| eval_ly(args.car, env) / eval_ly(args.second, env) }
+  add_fn(:"+", 2) { |args, env| args.car + args.second }
+  add_fn(:"-", 2) { |args, env| args.car - args.second }
+  add_fn(:"*", 2) { |args, env| args.car * args.second }
+  add_fn(:"/", 2) { |args, env| args.car / args.second }
   
-  add_fn(:"list", -1) {|args, env| eval_ly(args, env) }
-  add_fn(:"car", 1) {|args, env| eval_ly(args.car, env) }
-  add_fn(:"cdr", 1) {|args, env| eval_ly(args.cdr, env) }
-  add_fn(:"cons", 2) {|args, env| Cons.new(eval_ly(args.car, env), eval_ly(args.cdr, env)) }
+  add_fn(:"list", -1) { |args, env| args }
+  add_fn(:"car", 1) { |args, env| args.car }
+  add_fn(:"cdr", 1) { |args, env| args.cdr }
+  add_fn(:"cons", 2) { |args, env| Cons.new(args.car, args.cdr) }
   
-  add_fn(:"int", 1) {|args, env| eval_ly(args.car, env).to_i }
-  add_fn(:"float", 1) {|args, env| eval_ly(args.car, env).to_f }
-  add_fn(:"string", 1) {|args, env| eval_ly(args.car, env).to_str }
-  add_fn(:"string", 1) {|args, env| eval_ly(args.car, env).to_str }
+  add_fn(:"cons?", 1) { |args, env| args.car.is_a?(Cons)}
+  add_fn(:"int?", 1) { |args, env| args.car.is_a?(Integer)}
+  add_fn(:"float?", 1) { |args, env| args.car.is_a?(Float)}
+  add_fn(:"string?", 1) { |args, env| args.car.is_a?(String)}
   
-  add_fn(:"print", 1) {|args, env| print(elem_to_s(eval_ly(args.car, env))) }
-  add_fn(:"sprint", 2) {|args, env| eval_ly(args.car, env).print(elem_to_s(eval_ly(args.second, env))) }
-  add_fn(:"read", 0) {|args, env| gets }
-  add_fn(:"sread", 1) {|args, env| eval_ly(args.car, env).gets }
-  add_fn(:"slurp", 1) {|args, env| IO.read(eval_ly(args.car, env)) }
-  add_fn(:"spit", 2) {|args, env| IO.write(eval_ly(args.car, env), eval_ly(args.second, env)) }
+  add_fn(:"int", 1) { |args, env| args.car.to_i }
+  add_fn(:"float", 1) { |args, env| args.car.to_f }
+  add_fn(:"string", 1) { |args, env| args.car.to_s }
   
+  add_fn(:"print", 1) { |args, env| print(elem_to_s(args.car)) }
+  add_fn(:"sprint", 2) { |args, env| args.car.print(elem_to_s(args.second)) }
+  add_fn(:"println", 1) { |args, env| print(elem_to_s(args.car)) }
+  add_fn(:"read", 0) { |args, env| gets }
+  add_fn(:"sread", 1) { |args, env| args.car.gets }
+  add_fn(:"slurp", 1) { |args, env| IO.read(args.car) }
+  add_fn(:"spit", 2) { |args, env| IO.write(args.car, args.second) }
+  
+  true
 end
 
 # Turns 2 lists into a combined one.
@@ -281,14 +289,14 @@ def evdefine(expr, env, ismacro)
     name = expr.first.first
     args_expr = expr.first.rest
     body = expr.rest
-    if ismacro
-      res = LyraFn.new(name, list_len(args_expr)) do |args, environment|
-        env1 = append(pairs(args_expr, args), environment)
-        eval_keep_last(body, env1)
-      end
-    else
-      res = evlambda(args_expr, body)
-    end
+    #if ismacro
+    #  res = LyraFn.new(name, true, list_len(args_expr)) do |args, environment|
+    #    env1 = append(pairs(args_expr, args), environment)
+    #    eval_keep_last(body, env1)
+    #  end
+    #else
+      res = evlambda(args_expr, body, ismacro)
+    #end
     res.name = name
   else
     # Form is `(define .. ...)` (Variable definition)
@@ -303,10 +311,10 @@ end
 
 # args_expr has the format `(args...)`
 # body_expr has the format `expr...`
-def evlambda(args_expr, body_expr)
+def evlambda(args_expr, body_expr, ismacro = false)
   arg_count = list_len(args_expr)
-  LyraFn.new("", arg_count) do |args, environment|
-    env1 = append(pairs(args_expr, eval_list(args, environment)), environment)
+  LyraFn.new("", ismacro, arg_count) do |args, environment|
+    env1 = append(pairs(args_expr, args), environment)
     eval_keep_last(body_expr, env1)
   end
 end
@@ -342,7 +350,10 @@ def eval_ly(expr, env)
       evdefine(expr.cdr, env, true)
     else
       # Find value of symbol in env and call it as a function
-      eval_ly(expr.car, env).call(expr.cdr, env)
+      func = eval_ly(expr.car, env)
+      args = expr.cdr
+      args = eval_list(args, env) unless func.ismacro
+      func.call(args, env)
     end
   else
     expr # Atoms evaluate to themselves
@@ -356,18 +367,20 @@ expr3 = list(:"let*", list(:x, 1), list(:"+", :x, 15))
 expr4 = list(:"define", list(:id, :e), :e)
 expr5 = list(expr4, list(:id, 177))
 expr6 = list(:"def-macro", list(:doub, :x), list(:cons, :x, :x))
-expr7 = list(list(:"def-macro", list(:doub, :x), :x), list(:doub, :"***"))
+expr7 = list(:"def-macro", list(:macroid, :x), :x)
+expr8 = list(:doub, :"***")
 
 #puts elem_to_s(eval_ly(expr0, env1))
 #puts (eval_ly(1, env1))
 #puts elem_to_s(eval_list(list(1,2,3), env1))
 setup_core_functions()
-puts ENV
-puts associated(:"+", ENV)
-puts elem_to_s(eval_ly(expr1, ENV).call(Cons.new(66,nil), ENV))
+#puts ENV
+#puts associated(:"+", ENV)
+puts elem_to_s(eval_ly(expr1, ENV))
 puts elem_to_s(eval_ly(expr2, ENV))
 puts elem_to_s(eval_ly(expr3, ENV))
 puts elem_to_s(eval_ly(expr4, ENV))
 puts elem_to_s(eval_ly(expr5, ENV))
 puts elem_to_s(eval_ly(expr6, ENV))
 puts elem_to_s(eval_ly(expr7, ENV))
+puts elem_to_s(eval_ly(expr8, ENV))

@@ -93,6 +93,44 @@ puts elem_to_s(ast)
 puts
 =end
 
+def list_len(cons)
+  if cons.nil?
+    0
+  else
+    1 + list_len(cons.cdr)
+  end
+end
+
+# nil is not a valid pair but will be used as a separator between local ENV
+# and global ENV.
+ENV = Cons.new(nil,nil)
+
+class LyraFn < Proc
+  attr_reader :arg_counts
+  attr_reader :body
+  
+  def initialize(min_args, max_args=min_args, &body)
+    @arg_counts = (min_args .. max_args)
+    @body = body
+  end
+  
+  def call(args, env)
+    args_given = list_len(args)
+    raise "Too few arguments." if args_given < args.first
+    raise "Too many arguments." if arg_count >= 0 && args_given > arg_count
+    
+    body.call(args, env)
+  end
+end
+
+def setup_core_functions
+  def add_fn(name, min_args, max_args=min_args, &body)
+    ENV.cdr = Cons.new( , ENV.cdr)
+  end
+
+  
+end
+
 # Turns 2 lists into a combined one.
 # pairs(list(1,2,3), list(4,5,6)) => ((1 . 4) (2 . 5) (3 . 6))
 def pairs(cons0, cons1)

@@ -1,0 +1,65 @@
+(define (load! f)
+  (eval! (parse (slurp! f))))
+
+(define require! load!)
+(define import! load!)
+
+(define empty? null?)
+
+(define (inc n) (+ n 1))
+(define (dec n) (- n 1))
+
+(define (nth xs index)
+  (if xs
+    (if (= index 0)
+      (car xs)
+      (nth (cdr xs) (- index 1)))
+    '()))
+
+(define (read!)
+  (sread! stdin))
+
+(define (print! s)
+  (sprint! stdout s))
+
+(define (println! s)
+  (sprint! stdout s)
+  (sprint! stdout "\n"))
+
+(define (begin e0 e1)
+  (if e0 e1 e1))
+
+(define (map f xs)
+  (if (null? xs)
+    '()
+    (cons (f (car xs)) (map f (cdr xs)))))
+
+(define (map! f xs)
+  (if (null? xs)
+    xs
+    (begin
+      (set-car! xs (f (car xs))
+      (map! f (cdr xs))))))
+
+(define (filter f xs)
+  (if (null? xs)
+    '()
+    (if (f (car xs))
+      (cons (car xs) (filter f (cdr xs)))
+      (filter f (cdr xs)))))
+
+
+(println! 15)
+(println! (load! "example.lyra"))
+
+
+
+
+
+
+
+
+
+
+
+

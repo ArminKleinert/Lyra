@@ -4,7 +4,7 @@
 # "(?:\\.|[^\\"])*"? Matches 0 or 1 string
 # ;.* Matches comment and rest or line
 # [^\s\[\]{}('"`,;)]* Everything else
-RE = /[\s,]*([()']|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)/
+RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
 
 class Cons 
   attr_accessor :car
@@ -93,7 +93,7 @@ def list(*args)
 end
 
 def parse_str(token)
-  token.gsub(/\\./, {"\\\\" => "\\", "\\n" => "\n", "\\\"" => '"'})
+  token.gsub(/\\./, {"\\\\" => "\\", "\\n" => "\n", "\\\"" => '"'})[1..-2]
 end
 
 def make_ast(tokens, level=0)
@@ -106,13 +106,18 @@ def make_ast(tokens, level=0)
       raise "Unexpected ')'" if level == 0
       return list(*root)
     when '"'                    then raise "Unexpected '\"'"
-    when "nil"                  then root << nil
+    when "'()"                  then root << nil
     when "#t"                   then root << true
     when "#f"                   then root << false
     when /^-?[0-9]+$/           then root << t.to_i
     when /^-?[0-9][0-9.]*$/     then root << t.to_f
     when /^"(?:\\.|[^\\"])*"$/  then root << parse_str(t)
-    else root << t.to_sym
+    else
+      if t.start_with?("'")
+        root << list(:quote, t[1..-1].to_sym)
+      else
+        root << t.to_sym
+      end
     end
   end
   raise "Expected ')', got EOF" if level != 0
@@ -132,17 +137,11 @@ def cdr(x)
 end
 
 def list_len(cons)
-  if cons.nil?
-    0
-  else
+  if cons.is_a?(Cons)
     1 + list_len(cons.cdr)
+  else
+    0
   end
-end
-
-# nil is not a valid pair but will be used as a separator between local LYRA_ENV
-# and global LYRA_ENV.
-unless  Object.const_defined?(:LYRA_ENV)
-LYRA_ENV = Cons.new(nil,nil)
 end
 
 class LyraFn < Proc
@@ -160,8 +159,8 @@ class LyraFn < Proc
   
   def call(args, env)
     args_given = list_len(args)
-    raise "Too few arguments." if args_given < arg_counts.first
-    raise "Too many arguments." if arg_counts.last >= 0 && args_given > arg_counts.last
+    raise "#{@name}: Too few arguments. (Given #{args_given}, expected #{@arg_counts})" if args_given < arg_counts.first
+    raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
     body.call(args, env)
   end
@@ -174,42 +173,70 @@ end
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
     entry = Cons.new(name, LyraFn.new(name, false, min_args, max_args, &body))
-    LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr)
+    LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
+  end
+  def add_var(name, value)
+    LYRA_ENV.cdr = Cons.new(Cons.new(name, value), LYRA_ENV.cdr)
   end
   
-  add_fn(:"+", 2) { |args, _| args.car + args.second }
-  add_fn(:"-", 2) { |args, _| args.car - args.second }
-  add_fn(:"*", 2) { |args, _| args.car * args.second }
-  add_fn(:"/", 2) { |args, _| args.car / args.second }
+  add_fn(:"=", 2)        { |args, _| args.car == args.second }
   
-  add_fn(:"list", -1) { |args, _| args }
-  add_fn(:"car", 1) { |args, _| args.car.car }
-  add_fn(:"cdr", 1) { |args, _| args.car.cdr }
-  add_fn(:"cons", 2) { |args, _| Cons.new(args.car, args.cdr) }
+  add_fn(:"<", 2)        { |args, _| args.car < args.second }
+  add_fn(:">", 2)        { |args, _| args.car > args.second }
   
-  add_fn(:"cons?", 1) { |args, _| args.car.is_a?(Cons)}
-  add_fn(:"int?", 1) { |args, _| args.car.is_a?(Integer)}
-  add_fn(:"float?", 1) { |args, _| args.car.is_a?(Float)}
-  add_fn(:"string?", 1) { |args, _| args.car.is_a?(String)}
+  add_fn(:"+", 2)        { |args, _| args.car + args.second }
+  add_fn(:"-", 2)        { |args, _| args.car - args.second }
+  add_fn(:"*", 2)        { |args, _| args.car * args.second }
+  add_fn(:"/", 2)        { |args, _| args.car / args.second }
+  add_fn(:"%", 2)        { |args, _| args.car % args.second }
   
-  add_fn(:"int", 1) { |args, _| args.car.to_i }
-  add_fn(:"float", 1) { |args, _| args.car.to_f }
-  add_fn(:"string", 1) { |args, _| args.car.to_s }
+  add_fn(:"&", 2)        { |args, _| args.car & args.second }
+  add_fn(:"|", 2)        { |args, _| args.car | args.second }
+  add_fn(:"^", 2)        { |args, _| args.car ^ args.second }
+  add_fn(:"**", 2)       { |args, _| args.car ** args.second }
   
-  add_fn(:"print", 1) { |args, _| print(elem_to_s(args.car)) }
-  add_fn(:"sprint", 2) { |args, _| args.car.print(elem_to_s(args.second)) }
-  add_fn(:"println", 1) { |args, _| puts(elem_to_s(args.car)) }
-  add_fn(:"read", 0) { |args, _| gets }
-  add_fn(:"sread", 1) { |args, _| args.car.gets }
-  add_fn(:"slurp", 1) { |args, _| IO.read(args.car) }
-  add_fn(:"spit", 2) { |args, _| IO.write(args.car, args.second) }
+  add_fn(:"list", -1)    { |args, _| args }
+  add_fn(:"car", 1)      { |args, _| args.car.car }
+  add_fn(:"cdr", 1)      { |args, _| args.car.cdr }
+  add_fn(:"cons", 2)     { |args, _| Cons.new(args.car, args.second) }
+
+  add_fn(:"null?", 1)    { |args, _| args.car.nil? }
+  add_fn(:"cons?", 1)    { |args, _| args.car.is_a?(Cons)}
+  add_fn(:"int?", 1)     { |args, _| args.car.is_a?(Integer)}
+  add_fn(:"float?", 1)   { |args, _| args.car.is_a?(Float)}
+  add_fn(:"string?", 1)  { |args, _| args.car.is_a?(String)}
   
-  add_fn(:"eval", 1) { |args, env| eval_ly(args.car, env) }
-  add_fn(:"parse", 1) { |args, env| s = args.car[1..-2]
-                        make_ast(tokenize(parse_str(s))) }
-  add_fn(:"env!", 0) { |_, env| env }
+  add_fn(:"int", 1)      { |args, _| args.car.to_i }
+  add_fn(:"float", 1)    { |args, _| args.car.to_f }
+  add_fn(:"string", 1)   { |args, _| args.car.to_s }
+  add_fn(:"bool", 1)     { |args, _| !!args.car }
+  
+  add_fn(:"sprint!", 2)  { |args, _| e = e.is_a?(String) ? args.second : elem_to_s(args.second)
+                              args.car.print(e)}
+  add_fn(:"sread!", 1)   { |args, _| args.car.gets }
+  add_fn(:"slurp!", 1)   { |args, _| IO.read(args.car) }
+  add_fn(:"spit!", 2)    { |args, _| IO.write(args.car, args.second) }
+  
+  add_fn(:"eval!", 1)    { |args, env| eval_keep_last(args.car, env) }
+  add_fn(:"parse", 1)    { |args, env| s = args.car
+                                       make_ast(tokenize(s)) }
+  add_fn(:"env!", 0)     { |_, env| env }
+  add_fn(:"global-env!", 0) { |_, _| LYRA_ENV }
+  add_fn(:"time!", 0)    { |_, _| Time.now.to_f }
+  
+  add_var(:stdin, $stdin)
+  add_var(:stdout, $stdout)
+  add_var(:stderr, $stderr)
+  add_var(:NIL, list())
   
   true
+end
+
+# nil is not a valid pair but will be used as a separator between local LYRA_ENV
+# and global LYRA_ENV.
+unless  Object.const_defined?(:LYRA_ENV)
+  LYRA_ENV = Cons.new(nil,nil)
+  setup_core_functions()
 end
 
 def evalstr(s, env=LYRA_ENV)
@@ -302,7 +329,7 @@ def evdefine(expr, env, ismacro)
     # Form is `(define .. ...)` (Variable definition)
     name = expr.first
     val = expr.second
-    res = eval_ly(val)
+    res = eval_ly(val, env)
   end
   entry = Cons.new(name, res)
   LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr) # Put new entry into global LYRA_ENV
@@ -352,6 +379,7 @@ def eval_ly(expr, env)
     else
       # Find value of symbol in env and call it as a function
       func = eval_ly(expr.car, env)
+      func = eval_ly(func, env) if func.is_a?(Cons)
       args = expr.cdr
       if func.ismacro
         eval_ly(func.call(args, env), env)
@@ -365,34 +393,6 @@ def eval_ly(expr, env)
   end
 end
 
+puts make_ast(tokenize("; comment\n(bla)"))
 
-expr9 = '
-  (def-macro (dodouble f x y) (list f (list f x y) (list f x y)))
-  (define (do f x y) (f x y))
-  (println (list + 6 7))
-  (println (dodouble + 3 4))
-  (println (eval (dodouble + 3 4)))
-  ;(println ((quote (dodouble + 3 4)))) ; FIXME
-  (println (eval (quote (dodouble + 3 4)))) ; FIXME
-  (println (eval (car (parse "(+ 6 7)"))))
-  (println (eval (list + 6 7)))
-  '
-
-#puts elem_to_s(eval_ly(expr0, env1))
-#puts (eval_ly(1, env1))
-#puts elem_to_s(eval_list(list(1,2,3), env1))
-setup_core_functions()
-#puts LYRA_ENV
-#puts associated(:"+", LYRA_ENV)
-=begin
-puts elem_to_s(eval_ly(expr1, LYRA_ENV))
-puts elem_to_s(eval_ly(expr2, LYRA_ENV))
-puts elem_to_s(eval_ly(expr3, LYRA_ENV))
-puts elem_to_s(eval_ly(expr4, LYRA_ENV))
-puts elem_to_s(eval_ly(expr5, LYRA_ENV))
-puts elem_to_s(eval_ly(expr6, LYRA_ENV))
-puts elem_to_s(eval_ly(expr7, LYRA_ENV))
-puts elem_to_s(eval_ly(expr8, LYRA_ENV))
-=end
-puts elem_to_s("(+ 5 6)")
-puts evalstr(expr9)
+evalstr(IO.read(ARGV[0]))

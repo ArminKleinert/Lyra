@@ -28,6 +28,91 @@ Function
 `(list ...)` Creates a list (chained conses).  
 `(if <predicate> <then> <else>)` Common if. Executes the predicate. If it is true, evaluates `then`, if not, evaluates `else`.
 
+```
+Natively implemented:
+Function | Arity | Description
+---------+-------+------------------------------------------------------------
+=        | 2     | Checks 2 values for equality.
+<        | 2     | Checks whether the first argument is less than the second.
+>        | 2     | Checks whether the second argument is less than the first.
+         |       | 
++        | 2     | Addition. Adding to a string also works.
+-        | 2     | Subtraction
+*        | 2     | Multiplication
+/        | 2     | Division
+%        | 2     | Modulo
+&        | 2     | Bitwise and
+|        | 2     | Bitwise or
+^        | 2     | Bitwise xor
+         |       | 
+list     | any   | Creates a list ending with nil.
+car      | 1     | Gets the car of a pair.
+cdr      | 1     | Gets the cons of a pair.
+cons     | 2     | Creates a new cons.
+         |       | 
+null?    | 1     | Checks equality to nil.
+cons?    | 1     | Checks whether the value is a cons.
+int?     | 1     | Checks whether the value is a int.
+float?   | 1     | Checks whether the value is a float.
+string?  | 1     | Checks whether the value is a string.
+         |       | 
+int      | 1     | Tries to convert a value to an int.
+float    | 1     | Tries to convert a value to a float.
+string   | 1     | Tries to convert a value to a string.
+bool     | 1     | Triess to convert a value to a bool.
+         |       | 
+sprint!  | 2     | Prints a string (2nd argument) to a stream (1st argument).
+sread!   | 1     | Reads a string from a stream.
+slurp!   | 1     | Reads all contents of a file into a string.
+spit!    | 2     | Writes a string (2nd argument) into a file (1st argument).
+         |       | 
+eval!    | 1     | Evaluates an expression.
+parse    | 1     | Parses a string into an expression.
+         |       | 
+env!     | 0     | Gets the current (local) environment. Highly unsafe. 
+         |       | Use at your own risk!
+global-env!| 0   | Like env!, but ignores the local environment. Also unsafe.
+time!    | 0     | Get the current time in seconds as a floating point number.
+
+Untested: sprint!, sread!, slurp!, spit!, env! 
+
+Core functions:
+Function | Arity | Description
+---------+-------+------------------------------------------------------------
+empty?   | 1     | Same as null?
+inc      | 1     | Increment a number by 1
+dec      | 1     | Decrement a number by 1
+nth      | 2     | 
+print!   | 1     | Prints a string to stdout.
+println! | 1     | Prints a string to stdout followed by a newline.
+read!    | 0     | Reads a string from stdin.
+map      | 2     | 
+map!     | 2     | Impure map. Modifies the each element. (!)
+filter   | 2     | 
+
+Untested: filter
+
+
+Variable | Description
+---------+------------------------------
+stdin    | Standard input stream.
+stdout   | Standard output stream.
+stderr   | Standard error stream.
+NIL      | The empty list.
+ENV      | Global environment.
+```
+
+## Missing features:
+
+Variadic arguments.
+
+Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.
+
+`import/require/load` command. This can probably be implemented as `(eval! (parse (slurp! file)))`, but I need to try.
+
+"Curried" lambdas like the following: `(lambda (n) (lambda (m) (+ n m)))`  
+This will fail because `n` won't be found when the inner lambda is called. The same happens with lambdas inside a `let*`.
+
 ## Videos:
 
 https://www.youtube.com/playlist?list=PLatjRac4Qo4BQ-ksFWeYUt8FL03MnJVPK

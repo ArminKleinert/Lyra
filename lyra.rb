@@ -81,7 +81,7 @@ def elem_to_s(e)
 end
 
 def tokenize(s)
-  s.scan(RE).flatten.reject{|s| s.empty?}
+  s.scan(RE).flatten.reject{|s| s.empty? || s.start_with?(";")}
 end
 
 def list(*args)
@@ -131,18 +131,6 @@ def cdr(x)
   x.cdr
 end
 
-
-=begin
-s = ";Comment\n\"string\"\n1\n(define (inc n) (+ n 1))"
-tokens = tokenize(s)
-puts tokens.inspect
-
-ast = make_ast(tokens)
-puts ast.class
-puts elem_to_s(ast)
-puts
-=end
-
 def list_len(cons)
   if cons.nil?
     0
@@ -151,9 +139,11 @@ def list_len(cons)
   end
 end
 
-# nil is not a valid pair but will be used as a separator between local ENV
-# and global ENV.
-ENV = Cons.new(nil,nil)
+# nil is not a valid pair but will be used as a separator between local LYRA_ENV
+# and global LYRA_ENV.
+unless  Object.const_defined?(:LYRA_ENV)
+LYRA_ENV = Cons.new(nil,nil)
+end
 
 class LyraFn < Proc
   attr_reader :arg_counts
@@ -184,37 +174,47 @@ end
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
     entry = Cons.new(name, LyraFn.new(name, false, min_args, max_args, &body))
-    ENV.cdr = Cons.new(entry , ENV.cdr)
+    LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr)
   end
   
-  add_fn(:"+", 2) { |args, env| args.car + args.second }
-  add_fn(:"-", 2) { |args, env| args.car - args.second }
-  add_fn(:"*", 2) { |args, env| args.car * args.second }
-  add_fn(:"/", 2) { |args, env| args.car / args.second }
+  add_fn(:"+", 2) { |args, _| args.car + args.second }
+  add_fn(:"-", 2) { |args, _| args.car - args.second }
+  add_fn(:"*", 2) { |args, _| args.car * args.second }
+  add_fn(:"/", 2) { |args, _| args.car / args.second }
   
-  add_fn(:"list", -1) { |args, env| args }
-  add_fn(:"car", 1) { |args, env| args.car }
-  add_fn(:"cdr", 1) { |args, env| args.cdr }
-  add_fn(:"cons", 2) { |args, env| Cons.new(args.car, args.cdr) }
+  add_fn(:"list", -1) { |args, _| args }
+  add_fn(:"car", 1) { |args, _| args.car.car }
+  add_fn(:"cdr", 1) { |args, _| args.car.cdr }
+  add_fn(:"cons", 2) { |args, _| Cons.new(args.car, args.cdr) }
   
-  add_fn(:"cons?", 1) { |args, env| args.car.is_a?(Cons)}
-  add_fn(:"int?", 1) { |args, env| args.car.is_a?(Integer)}
-  add_fn(:"float?", 1) { |args, env| args.car.is_a?(Float)}
-  add_fn(:"string?", 1) { |args, env| args.car.is_a?(String)}
+  add_fn(:"cons?", 1) { |args, _| args.car.is_a?(Cons)}
+  add_fn(:"int?", 1) { |args, _| args.car.is_a?(Integer)}
+  add_fn(:"float?", 1) { |args, _| args.car.is_a?(Float)}
+  add_fn(:"string?", 1) { |args, _| args.car.is_a?(String)}
   
-  add_fn(:"int", 1) { |args, env| args.car.to_i }
-  add_fn(:"float", 1) { |args, env| args.car.to_f }
-  add_fn(:"string", 1) { |args, env| args.car.to_s }
+  add_fn(:"int", 1) { |args, _| args.car.to_i }
+  add_fn(:"float", 1) { |args, _| args.car.to_f }
+  add_fn(:"string", 1) { |args, _| args.car.to_s }
   
-  add_fn(:"print", 1) { |args, env| print(elem_to_s(args.car)) }
-  add_fn(:"sprint", 2) { |args, env| args.car.print(elem_to_s(args.second)) }
-  add_fn(:"println", 1) { |args, env| print(elem_to_s(args.car)) }
-  add_fn(:"read", 0) { |args, env| gets }
-  add_fn(:"sread", 1) { |args, env| args.car.gets }
-  add_fn(:"slurp", 1) { |args, env| IO.read(args.car) }
-  add_fn(:"spit", 2) { |args, env| IO.write(args.car, args.second) }
+  add_fn(:"print", 1) { |args, _| print(elem_to_s(args.car)) }
+  add_fn(:"sprint", 2) { |args, _| args.car.print(elem_to_s(args.second)) }
+  add_fn(:"println", 1) { |args, _| puts(elem_to_s(args.car)) }
+  add_fn(:"read", 0) { |args, _| gets }
+  add_fn(:"sread", 1) { |args, _| args.car.gets }
+  add_fn(:"slurp", 1) { |args, _| IO.read(args.car) }
+  add_fn(:"spit", 2) { |args, _| IO.write(args.car, args.second) }
+  
+  add_fn(:"eval", 1) { |args, env| eval_ly(args.car, env) }
+  add_fn(:"parse", 1) { |args, env| s = args.car[1..-2]
+                        make_ast(tokenize(parse_str(s))) }
+  add_fn(:"env!", 0) { |_, env| env }
   
   true
+end
+
+def evalstr(s, env=LYRA_ENV)
+  ast = make_ast(tokenize(s))
+  eval_keep_last(ast, env)
 end
 
 # Turns 2 lists into a combined one.
@@ -278,7 +278,7 @@ def eval_keep_last(expr_list, env)
   end
 end
 
-# Defines a new function or variable and puts it into the global ENV.
+# Defines a new function or variable and puts it into the global LYRA_ENV.
 # If `ismacro` is true, the function will not evaluate its
 # arguments right away.
 def evdefine(expr, env, ismacro)
@@ -305,7 +305,7 @@ def evdefine(expr, env, ismacro)
     res = eval_ly(val)
   end
   entry = Cons.new(name, res)
-  ENV.cdr = Cons.new(entry , ENV.cdr) # Put new entry into global ENV
+  LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr) # Put new entry into global LYRA_ENV
   res
 end
 
@@ -345,42 +345,54 @@ def eval_ly(expr, env)
       env1 = Cons.new(Cons.new(name, val), env)
       eval_keep_last(expr.cdr.cdr, env1)
     when :quote
-      expr.cdr # TODO TEST
+      raise "Too many arguments for quote" unless expr.cdr.cdr.nil?
+      expr.second
     when :"def-macro"
       evdefine(expr.cdr, env, true)
     else
       # Find value of symbol in env and call it as a function
       func = eval_ly(expr.car, env)
       args = expr.cdr
-      args = eval_list(args, env) unless func.ismacro
-      func.call(args, env)
+      if func.ismacro
+        eval_ly(func.call(args, env), env)
+      else
+        args = eval_list(args, env)
+        func.call(args, env)
+      end
     end
   else
     expr # Atoms evaluate to themselves
   end
 end
 
-expr0 = list(:"+", 1, 2)
-expr1 = list(:lambda, list(:e), :e)
-expr2 = list(list(:lambda, list(:e), :e), 67)
-expr3 = list(:"let*", list(:x, 1), list(:"+", :x, 15))
-expr4 = list(:"define", list(:id, :e), :e)
-expr5 = list(expr4, list(:id, 177))
-expr6 = list(:"def-macro", list(:doub, :x), list(:cons, :x, :x))
-expr7 = list(:"def-macro", list(:macroid, :x), :x)
-expr8 = list(:doub, :"***")
+
+expr9 = '
+  (def-macro (dodouble f x y) (list f (list f x y) (list f x y)))
+  (define (do f x y) (f x y))
+  (println (list + 6 7))
+  (println (dodouble + 3 4))
+  (println (eval (dodouble + 3 4)))
+  ;(println ((quote (dodouble + 3 4)))) ; FIXME
+  (println (eval (quote (dodouble + 3 4)))) ; FIXME
+  (println (eval (car (parse "(+ 6 7)"))))
+  (println (eval (list + 6 7)))
+  '
 
 #puts elem_to_s(eval_ly(expr0, env1))
 #puts (eval_ly(1, env1))
 #puts elem_to_s(eval_list(list(1,2,3), env1))
 setup_core_functions()
-#puts ENV
-#puts associated(:"+", ENV)
-puts elem_to_s(eval_ly(expr1, ENV))
-puts elem_to_s(eval_ly(expr2, ENV))
-puts elem_to_s(eval_ly(expr3, ENV))
-puts elem_to_s(eval_ly(expr4, ENV))
-puts elem_to_s(eval_ly(expr5, ENV))
-puts elem_to_s(eval_ly(expr6, ENV))
-puts elem_to_s(eval_ly(expr7, ENV))
-puts elem_to_s(eval_ly(expr8, ENV))
+#puts LYRA_ENV
+#puts associated(:"+", LYRA_ENV)
+=begin
+puts elem_to_s(eval_ly(expr1, LYRA_ENV))
+puts elem_to_s(eval_ly(expr2, LYRA_ENV))
+puts elem_to_s(eval_ly(expr3, LYRA_ENV))
+puts elem_to_s(eval_ly(expr4, LYRA_ENV))
+puts elem_to_s(eval_ly(expr5, LYRA_ENV))
+puts elem_to_s(eval_ly(expr6, LYRA_ENV))
+puts elem_to_s(eval_ly(expr7, LYRA_ENV))
+puts elem_to_s(eval_ly(expr8, LYRA_ENV))
+=end
+puts elem_to_s("(+ 5 6)")
+puts evalstr(expr9)

@@ -6,7 +6,57 @@
 # [^\s\[\]{}('"`,;)]* Everything else
 RE = /[\s,]*([()']|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)/
 
-Cons = Struct.new :car, :cdr
+class Cons 
+  attr_accessor :car
+  attr_accessor :cdr
+  
+  def initialize(car, cdr)
+    @car = car
+    @cdr = cdr
+  end
+  
+  def to_s
+    elem_to_s(self)
+  end
+
+  def first
+    @car
+  end
+  
+  def second
+    @cdr.car
+  end
+  
+  def third
+    @cdr.cdr.car
+  end
+  
+  def fourth
+    @cdr.cdr.cdr.car
+  end
+  
+  def rest
+    @cdr
+  end
+  
+  def nth(i)
+    if i == 0
+      @car
+    elsif !(@cdr.is_a?(Cons))
+      nil
+    else
+      @cdr.nth(i-1)
+    end
+  end
+  
+  def nthrest(i)
+    if i == 0 || @cdr.nil?
+      @cdr
+    else
+      @cdr.nthrest(i-1)
+    end
+  end
+end
 
 def list_to_s_helper(cons)
   if cons.cdr.nil?
@@ -108,26 +158,54 @@ ENV = Cons.new(nil,nil)
 class LyraFn < Proc
   attr_reader :arg_counts
   attr_reader :body
+  attr_accessor :name
   
-  def initialize(min_args, max_args=min_args, &body)
+  def initialize(name, min_args, max_args=min_args, &body)
     @arg_counts = (min_args .. max_args)
     @body = body
+    @name = name
   end
   
   def call(args, env)
     args_given = list_len(args)
-    raise "Too few arguments." if args_given < args.first
-    raise "Too many arguments." if arg_count >= 0 && args_given > arg_count
+    raise "Too few arguments." if args_given < arg_counts.first
+    raise "Too many arguments." if arg_counts.last >= 0 && args_given > arg_counts.last
     
     body.call(args, env)
+  end
+  
+  def to_s
+    "<function #{name}>"
   end
 end
 
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
-    ENV.cdr = Cons.new( , ENV.cdr)
+    entry = Cons.new(name, LyraFn.new(name, min_args, max_args, &body))
+    ENV.cdr = Cons.new(entry , ENV.cdr)
   end
-
+  
+  add_fn(:"+", 1, 2) {|args, env| 0 + eval_ly(args.car, env) + eval_ly(args.second, env) }
+  add_fn(:"-", 2) {|args, env| eval_ly(args.car, env) - eval_ly(args.second, env) }
+  add_fn(:"*", 2) {|args, env| eval_ly(args.car, env) * eval_ly(args.second, env) }
+  add_fn(:"/", 2) {|args, env| eval_ly(args.car, env) / eval_ly(args.second, env) }
+  
+  add_fn(:"list", -1) {|args, env| eval_ly(args, env) }
+  add_fn(:"car", 1) {|args, env| eval_ly(args.car, env) }
+  add_fn(:"cdr", 1) {|args, env| eval_ly(args.cdr, env) }
+  add_fn(:"cons", 2) {|args, env| Cons.new(eval_ly(args.car, env), eval_ly(args.cdr, env)) }
+  
+  add_fn(:"int", 1) {|args, env| eval_ly(args.car, env).to_i }
+  add_fn(:"float", 1) {|args, env| eval_ly(args.car, env).to_f }
+  add_fn(:"string", 1) {|args, env| eval_ly(args.car, env).to_str }
+  add_fn(:"string", 1) {|args, env| eval_ly(args.car, env).to_str }
+  
+  add_fn(:"print", 1) {|args, env| print(elem_to_s(eval_ly(args.car, env))) }
+  add_fn(:"sprint", 2) {|args, env| eval_ly(args.car, env).print(elem_to_s(eval_ly(args.second, env))) }
+  add_fn(:"read", 0) {|args, env| gets }
+  add_fn(:"sread", 1) {|args, env| eval_ly(args.car, env).gets }
+  add_fn(:"slurp", 1) {|args, env| IO.read(eval_ly(args.car, env)) }
+  add_fn(:"spit", 2) {|args, env| IO.write(eval_ly(args.car, env), eval_ly(args.second, env)) }
   
 end
 
@@ -150,6 +228,9 @@ end
 def associated(x, env)
   if env.nil?
     raise "Symbol not found: #{elem_to_s(x)}"
+  elsif env.car.nil?
+    # Divider between local and global environments
+    associated(x, env.cdr)
   elsif eq?(env.car.car, x)
     env.car.cdr
   else
@@ -189,6 +270,47 @@ def eval_keep_last(expr_list, env)
   end
 end
 
+# Defines a new function or variable and puts it into the global ENV.
+# If `ismacro` is true, the function will not evaluate its
+# arguments right away.
+def evdefine(expr, env, ismacro)
+  name = nil
+  res = nil
+  if expr.first.is_a?(Cons)
+    # Form is `(define (...) ...)` (Function definition)
+    name = expr.first.first
+    args_expr = expr.first.rest
+    body = expr.rest
+    if ismacro
+      res = LyraFn.new(name, list_len(args_expr)) do |args, environment|
+        env1 = append(pairs(args_expr, args), environment)
+        eval_keep_last(body, env1)
+      end
+    else
+      res = evlambda(args_expr, body)
+    end
+    res.name = name
+  else
+    # Form is `(define .. ...)` (Variable definition)
+    name = expr.first
+    val = expr.second
+    res = eval_ly(val)
+  end
+  entry = Cons.new(name, res)
+  ENV.cdr = Cons.new(entry , ENV.cdr) # Put new entry into global ENV
+  res
+end
+
+# args_expr has the format `(args...)`
+# body_expr has the format `expr...`
+def evlambda(args_expr, body_expr)
+  arg_count = list_len(args_expr)
+  LyraFn.new("", arg_count) do |args, environment|
+    env1 = append(pairs(args_expr, eval_list(args, environment)), environment)
+    eval_keep_last(body_expr, env1)
+  end
+end
+
 # Evaluation function
 def eval_ly(expr, env)
   if expr.nil?
@@ -198,29 +320,26 @@ def eval_ly(expr, env)
   elsif expr.is_a?(Cons)
     case expr.car
     when :if
-      if eval_ly(expr.cdr.car, env)
-        eval_ly(expr.cdr.cdr.car, env)
+      if eval_ly(expr.second, env)
+        eval_ly(expr.third, env)
       else
-        eval_ly(expr.cdr.cdr.cdr.car, env)
+        eval_ly(expr.fourth, env)
       end
     when :lambda
-      args_expr = expr.cdr.car
+      args_expr = expr.second
       body_expr = expr.cdr.cdr
-      lambda do |args, environment|
-        env1 = append(pairs(args_expr, eval_list(args, env)), env)
-        eval_keep_last(body_expr, env1)
-      end
+      evlambda(args_expr, body_expr)
     when :define
-      # TODO
+      evdefine(expr.cdr, env, false)
     when :"let*"
-      name = expr.cdr.car.car
-      val = eval_ly(expr.cdr.car.cdr.car, env)
+      name = expr.second.car
+      val = eval_ly(expr.second.second, env)
       env1 = Cons.new(Cons.new(name, val), env)
       eval_keep_last(expr.cdr.cdr, env1)
     when :quote
-      # TODO
+      expr.cdr # TODO TEST
     when :"def-macro"
-      # TODO
+      evdefine(expr.cdr, env, true)
     else
       # Find value of symbol in env and call it as a function
       eval_ly(expr.car, env).call(expr.cdr, env)
@@ -230,15 +349,25 @@ def eval_ly(expr, env)
   end
 end
 
-env1 = list(Cons.new(:"+", lambda{|args, env| eval_ly(args.car, env) + eval_ly(args.cdr.car, env)}))
 expr0 = list(:"+", 1, 2)
 expr1 = list(:lambda, list(:e), :e)
-expr2 = list(list(:lambda, list(:e), :e), 1)
+expr2 = list(list(:lambda, list(:e), :e), 67)
 expr3 = list(:"let*", list(:x, 1), list(:"+", :x, 15))
+expr4 = list(:"define", list(:id, :e), :e)
+expr5 = list(expr4, list(:id, 177))
+expr6 = list(:"def-macro", list(:doub, :x), list(:cons, :x, :x))
+expr7 = list(list(:"def-macro", list(:doub, :x), :x), list(:doub, :"***"))
 
 #puts elem_to_s(eval_ly(expr0, env1))
 #puts (eval_ly(1, env1))
 #puts elem_to_s(eval_list(list(1,2,3), env1))
-puts elem_to_s(eval_ly(expr1, env1).call(Cons.new(1,nil), env1))
-puts elem_to_s(eval_ly(expr2, env1))
-puts elem_to_s(eval_ly(expr3, env1))
+setup_core_functions()
+puts ENV
+puts associated(:"+", ENV)
+puts elem_to_s(eval_ly(expr1, ENV).call(Cons.new(66,nil), ENV))
+puts elem_to_s(eval_ly(expr2, ENV))
+puts elem_to_s(eval_ly(expr3, ENV))
+puts elem_to_s(eval_ly(expr4, ENV))
+puts elem_to_s(eval_ly(expr5, ENV))
+puts elem_to_s(eval_ly(expr6, ENV))
+puts elem_to_s(eval_ly(expr7, ENV))

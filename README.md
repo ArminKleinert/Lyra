@@ -143,8 +143,6 @@ Variable | Description
 stdin    | Standard input stream.
 stdout   | Standard output stream.
 stderr   | Standard error stream.
-NIL      | The empty list.
-ENV      | Global environment.
 nil      | Alias for '().
 ```
 

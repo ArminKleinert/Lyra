@@ -88,18 +88,6 @@ def make_ast(tokens, level=0)
   list(*root)
 end
 
-def cons(x,y)
-  Cons.new(x,y)
-end
-
-def car(x)
-  x.car
-end
-
-def cdr(x)
-  x.cdr
-end
-
 def list_len(cons)
   if cons.is_a?(Cons)
     1 + list_len(cons.cdr)
@@ -175,7 +163,7 @@ def setup_core_functions
   add_fn(:"set-cdr!", 2)  { |args, _| first(args).cdr = second(args) }
 
   add_fn(:null?, 1)       { |args, _| first(args).nil? }
-  add_fn(:cons?, 1)        { |args, _| first(args).is_a?(Cons)}
+  add_fn(:cons?, 1)       { |args, _| first(args).is_a?(Cons)}
   add_fn(:int?, 1)        { |args, _| first(args).is_a?(Integer)}
   add_fn(:float?, 1)      { |args, _| first(args).is_a?(Float)}
   add_fn(:string?, 1)     { |args, _| first(args).is_a?(String)}
@@ -185,9 +173,7 @@ def setup_core_functions
   add_fn(:string, 1)      { |args, _| first(args).to_s }
   add_fn(:bool, 1)        { |args, _| !!first(args) }
 
-  add_fn(:sprint!, 2)     { |args, _|
-                            e = e.is_a?(String) ? second(args) : second(args)
-                            first(args).print(e)}
+  add_fn(:sprint!, 2)     { |args, _| first(args).print(second(args))}
   add_fn(:sread!, 1)      { |args, _| first(args).gets }
   add_fn(:slurp!, 1)      { |args, _| IO.read(first(args)) }
   add_fn(:spit!, 2)       { |args, _| IO.write(first(args), second(args)) }
@@ -219,6 +205,7 @@ end
 # and global LYRA_ENV.
 unless  Object.const_defined?(:LYRA_ENV)
   LYRA_ENV = Cons.new(nil,nil)
+  $lyra_call_stack = nil # Also handled as a cons
   setup_core_functions()
 end
 
@@ -240,9 +227,6 @@ def pairs(cons0, cons1)
 end
 
 # Check atoms for equality
-def eq?(x, y)
-  x == y
-end
 
 # Search environment for symbol
 def associated(x, env)
@@ -251,7 +235,7 @@ def associated(x, env)
   elsif env.car.nil?
     # Divider between local and global environments
     associated(x, env.cdr)
-  elsif eq?(env.car.car, x)
+  elsif env.car.car == x
     env.car.cdr
   else
     associated(x, env.cdr)
@@ -384,14 +368,24 @@ def eval_ly(expr, env)
     else
       # Find value of symbol in env and call it as a function
       func = eval_ly(first(expr), env)
+      if (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
+        # Tail call possible
+        # TODO
+      else
+      end
+      
+      # vvv Move this code into the `else`-block for non-tail-calls vvv
       func = eval_ly(func, env) if func.is_a?(Cons)
       args = rest(expr)
+      # TODO Also put argument names on the stack.
+      $lyra_call_stack = Cons.new(func, $lyra_call_stack)
       if func.ismacro
         eval_ly(func.call(args, env), env)
       else
         args = eval_list(args, env)
         func.call(args, env)
       end
+      # ^^^ Move this code into the `else`-block for non-tail-calls ^^^
     end
   else
     expr # Atoms evaluate to themselves

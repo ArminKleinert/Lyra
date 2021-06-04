@@ -13,6 +13,8 @@
 
 ; Operators
 (define = p=)
+(define eq? p=)
+(define eql´? p=)
 (define < p<)
 (define > p>)
 (define + p+)

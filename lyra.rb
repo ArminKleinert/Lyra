@@ -145,7 +145,12 @@ class LyraFn < Proc
     raise "#{@name}: Too few arguments. (Given #{args_given}, expected #{@arg_counts})" if args_given < arg_counts.first
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
+    begin
     body.call(args, env)
+    rescue RuntimeError
+      $stderr.puts "#{@name} failed with error: #{$!}"
+      raise
+    end
   end
   
   def to_s
@@ -156,6 +161,10 @@ end
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
     entry = Cons.new(name, LyraFn.new(name, false, min_args, max_args, &body))
+    LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
+  end
+  def add_macro(name, min_args, max_args=min_args, &body)
+    entry = Cons.new(name, LyraFn.new(name, true, min_args, max_args, &body))
     LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
   end
   def add_var(name, value)
@@ -177,37 +186,46 @@ def setup_core_functions
   add_fn(:"p|", 2)        { |args, _| first(args) | second(args) }
   add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) }
   
-  add_fn(:"list", -1)    { |args, _| args }
-  add_fn(:"car", 1)      { |args, _| first(args).car }
-  add_fn(:"cdr", 1)      { |args, _| first(args).cdr }
-  add_fn(:"cons", 2)     { |args, _| Cons.new(first(args), second(args)) }
-  add_fn(:"set-car!", 2) { |args, _| first(args).car = second(args) }
-  add_fn(:"set-cdr!", 2) { |args, _| first(args).cdr = second(args) }
+  add_fn(:list, -1)       { |args, _| args }
+  add_fn(:car, 1)         { |args, _| first(args).car }
+  add_fn(:cdr, 1)         { |args, _| first(args).cdr }
+  add_fn(:cons, 2)        { |args, _| Cons.new(first(args), second(args)) }
+  add_fn(:"set-car!", 2)  { |args, _| first(args).car = second(args) }
+  add_fn(:"set-cdr!", 2)  { |args, _| first(args).cdr = second(args) }
 
-  add_fn(:"null?", 1)    { |args, _| first(args).nil? }
-  add_fn(:"cons?", 1)    { |args, _| first(args).is_a?(Cons)}
-  add_fn(:"int?", 1)     { |args, _| first(args).is_a?(Integer)}
-  add_fn(:"float?", 1)   { |args, _| first(args).is_a?(Float)}
-  add_fn(:"string?", 1)  { |args, _| first(args).is_a?(String)}
+  add_fn(:null?, 1)       { |args, _| first(args).nil? }
+  add_fn(:cons?, 1)        { |args, _| first(args).is_a?(Cons)}
+  add_fn(:int?, 1)        { |args, _| first(args).is_a?(Integer)}
+  add_fn(:float?, 1)      { |args, _| first(args).is_a?(Float)}
+  add_fn(:string?, 1)     { |args, _| first(args).is_a?(String)}
   
-  add_fn(:"int", 1)      { |args, _| first(args).to_i }
-  add_fn(:"float", 1)    { |args, _| first(args).to_f }
-  add_fn(:"string", 1)   { |args, _| first(args).to_s }
-  add_fn(:"bool", 1)     { |args, _| !!first(args) }
+  add_fn(:int, 1)         { |args, _| first(args).to_i }
+  add_fn(:float, 1)       { |args, _| first(args).to_f }
+  add_fn(:string, 1)      { |args, _| first(args).to_s }
+  add_fn(:bool, 1)        { |args, _| !!first(args) }
   
-  add_fn(:"sprint!", 2)  { |args, _| e = e.is_a?(String) ? second(args) : elem_to_s(second(args))
-                              first(args).print(e)}
-  add_fn(:"sread!", 1)   { |args, _| first(args).gets }
-  add_fn(:"slurp!", 1)   { |args, _| IO.read(first(args)) }
-  add_fn(:"spit!", 2)    { |args, _| IO.write(first(args), second(args)) }
+  add_fn(:sprint!, 2)     { |args, _|
+                            e = e.is_a?(String) ? second(args) : elem_to_s(second(args))
+                            first(args).print(e)}
+  add_fn(:sread!, 1)      { |args, _| first(args).gets }
+  add_fn(:slurp!, 1)      { |args, _| IO.read(first(args)) }
+  add_fn(:spit!, 2)       { |args, _| IO.write(first(args), second(args)) }
   
-  add_fn(:"eval!", 1)    { |args, env| eval_keep_last(first(args), env) }
-  add_fn(:"parse", 1)    { |args, env| s = first(args)
-                                       make_ast(tokenize(s)) }
-  add_fn(:"env!", 0)     { |_, env| env }
-  add_fn(:"global-env!", 0) { |_, _| LYRA_ENV }
-  add_fn(:"time!", 0)    { |_, _| Time.now.to_f }
+  add_fn(:eval!, 1)       { |args, env| eval_keep_last(first(args), env) }
+  add_fn(:"call-with-env!", 2){ |args, _| args.car.call(args.cdr.car) }
+  add_fn(:parse, 1)       { |args, env| s = first(args)
+                                        make_ast(tokenize(s)) }
+  add_fn(:env!, 0)        { |_, env| env }
+  add_fn(:"global-env!", 0) { |_, _| LYRA_ENV.cdr }
+  add_fn(:time!, 0)       { |_, _| Time.now.to_f }
   
+  add_fn(:measure, 2)     { |args, env|
+                            t = Time.now
+                            first(args).times do |_|
+                              second(args).call(nil, env)
+                            end
+                            Time.now-t }
+
   add_var(:stdin, $stdin)
   add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
@@ -367,6 +385,15 @@ def eval_ly(expr, env)
       name = first(second(expr))
       val = eval_ly(second(second(expr)), env)
       env1 = Cons.new(Cons.new(name, val), env)
+      eval_keep_last(rest(rest(expr)), env1)
+    when :"let"
+      bindings = second(expr)
+      body = rest(rest(expr))
+      env1 = env
+      while bindings
+        env1 = Cons.new(Cons.new(bindings.car.car, bindings.car.cdr.car), env1)
+        bindings = bindings.cdr
+      end
       eval_keep_last(rest(rest(expr)), env1)
     when :quote
       raise "Too many arguments for quote" unless rest(rest(expr)).nil?

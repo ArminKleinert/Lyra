@@ -1,11 +1,17 @@
+
 (define (load! f)
   (eval! (parse (slurp! f))))
 
 (define require! load!)
 (define import! load!)
 
-(define empty? null?)
+(def-macro (comment & e)
+  )
 
+(define empty? null?)
+(define nil '())
+
+; Operators
 (define = p=)
 (define < p<)
 (define > p>)
@@ -18,22 +24,40 @@
 (define | p|)
 (define ^ p^)
 
-(def-macro (and x & xs)
-  (if x
-    (if (empty? xs)
-      x
-      (and (first xs) (rest xs)))
-    #f))
+; Accessors for conses
+(define first car)
+(define (second c) (car (cdr c)))
+(define (third c) (car (cdr (cdr c))))
+(define (rest c) (cdr c))
 
-(def-macro (or x & xs)
-  (if x
-    #t
-    (if (empty? xs)
-      #f
-      (and (first xs) (rest xs)))))
+(define (foldl f start coll)
+  (if (empty? coll)
+    start
+    (foldl f (f start (first coll) (rest coll)))))
+
+(define (foldr f start coll)
+  (if (empty? coll)
+    start
+    (f (first coll) (foldr f start (rest coll)))))
+
+; and
+(def-macro (and x y)
+  (if x y #f))
+
+(def-macro (or x y)
+  (if x #t y))
 
 (define (not x)
   (if x #f #t))
+
+; Length of cons
+(define (length c)
+  (if (not (cons? c))
+    0
+    (inc (length (dec c)))))
+
+(define (<= x y) (or (< x y) (= x y)))
+(define (>= x y) (or (> x y) (= x y)))
 
 (define (inc n) (+ n 1))
 (define (dec n) (- n 1))
@@ -77,27 +101,69 @@
       (cons (car xs) (filter f (cdr xs)))
       (filter f (cdr xs)))))
 
-(define (foldl f start coll)
-  (if (empty? coll)
-    start
-    (foldl f (f start (first coll) (rest coll)))))
+(define (last-entry cs)
+  (if (empty? (cdr cs))
+    cs
+    (last-entry (cdr cs))))
 
-(define (foldr f start coll)
-  (if (empty? coll)
-    start
-    (f (first coll) (foldr f start (rest coll)))))
+(define (deprioritise-helper! env sym val found)
+  (if (empty? env)
+    '()
+    (if (empty? (cdr env))
+      (if found
+        (if (= (car (car env)) sym)
+          (set-cdr! (car env) val)
+          (set-cdr! env (list (cons sym val))))
+        '())
+      (if (= (car (car env)) sym)
+        (if found
+          (begin
+            (set-car! env (car (cdr env)))
+            (set-cdr! env (cdr (cdr env))))
+          (let* (v (car (car env)))
+            (set-car! env (car (cdr env)))
+            (set-cdr! env (cdr (cdr env)))
+            (deprioritise-helper! (cdr env) sym v #t)))
+        (deprioritise-helper! (cdr env) sym val found)))))
 
-(def-macro (comment & e)
-  )
+; Find symbol in global env and move it to the end
+; Example:
+;   (define nothing '())
+;   (println! (index-in-env! 'nothing)) => 0
+;   (deprioritise! 'nothing)
+;   (println! (index-in-env! 'nothing)) => 86
+(define (deprioritise! sym)
+  (deprioritise-helper! (global-env!) sym '() #f))
 
-(println! 15)
-(println! (load! "example.lyra"))
+(define (index-in-env-helper! sym env i)
+  (if (empty? env)
+    -1
+    (if (= (car (car env)) sym)
+      i
+      (index-in-env-helper! sym (cdr env) (inc i)))))
 
-(comment Ignore this!)
+; Find the index of a symbol in the global environment.
+; Indexing starts at 0. If the symbol could not be found,
+; -1 is returned.
+(define (index-in-env! sym)
+  (index-in-env-helper! sym (global-env!) 0))
 
+(define nothing '())
 
+(comment
 
+(println! (index-in-env! 'nothing))
+(deprioritise! 'nothing)
+(println! (index-in-env! 'nothing))
+(deprioritise! 'nothing)
+(println! (index-in-env! 'nothing))
 
+(println!
+  (measure 1000
+    (lambda ()
+      ;(index-in-env! 'nothing)
+      (last-entry (global-env!)))))
+)
 
 
 

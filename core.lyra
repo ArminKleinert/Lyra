@@ -160,18 +160,18 @@
       (println! (car cs))
       (printall! (cdr cs)))))
 
-(println! (index-in-env! 'nothing))
-(deprioritise! 'nothing)
-(println! (index-in-env! 'nothing))
-(deprioritise! 'nothing)
-(println! (index-in-env! 'nothing))
-
 (define (times n f)
   (if (<= n 1)
     (f)
     (begin
       (f)
       (times (dec n) f))))
+
+(println!
+  (measure 200
+    (lambda ()
+      (deprioritise! 'nothing)
+      (index-in-env! 'nothing))))
 
 (comment
 
@@ -185,12 +185,14 @@
     10
     (lambda ()
       (last-entry (global-env!)))))
-)
 
 (define (crash)
   (crash))
 
-(crash)
+(times
+  100000
+  (lambda () '()))
+)
 
 
 

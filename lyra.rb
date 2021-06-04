@@ -6,13 +6,12 @@
 # [^\s\[\]{}('"`,;)]* Everything else
 RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
 
-
 Cons = Struct.new(:car, :cdr) do
   def list_to_s_helper()
     if cdr.nil?
       car.to_s
-    elsif @cdr.is_a?(Cons)
-      car.to_s´ + " " + cdr.list_to_s_helper
+    elsif cdr.is_a?(Cons)
+      car.to_s + " " + cdr.list_to_s_helper
     else
       car.to_s + " . " + cdr.to_s
     end
@@ -88,11 +87,18 @@ def make_ast(tokens, level=0)
   list(*root)
 end
 
-def list_len(cons)
-  if cons.is_a?(Cons)
-    1 + list_len(cons.cdr)
+def list_len(cons, n=0)
+  unless cons.is_a?(Cons)
+    n
   else
-    0
+    list_len(cons.cdr, n+1)
+  end
+end
+
+class TailCall < StandardError
+  attr_reader :args
+  def initialize(args)
+    @args = args
   end
 end
 
@@ -101,12 +107,14 @@ class LyraFn < Proc
   attr_reader :body
   attr_accessor :name
   attr_reader :ismacro
+  attr_reader :arg_names
   
-  def initialize(name, ismacro, min_args, max_args=min_args, &body)
+  def initialize(name, ismacro, min_args, max_args=min_args, arg_names=nil, &body)
     @arg_counts = (min_args .. max_args)
     @body = body
     @name = name
     @ismacro = ismacro
+    @arg_names = arg_names
   end
   
   def call(args, env)
@@ -114,26 +122,49 @@ class LyraFn < Proc
     raise "#{@name}: Too few arguments. (Given #{args_given}, expected #{@arg_counts})" if args_given < arg_counts.first
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
+    $lyra_call_stack = Cons.new(self, $lyra_call_stack)
+    
     begin
-      body.call(args, env)
+      r = body.call(args, env)
+    rescue TailCall => tailcall
+      unless native?
+        args = tailcall.args
+        retry
+      end
     rescue RuntimeError
       $stderr.puts "#{@name} failed with error: #{$!}"
       raise
     end
+    
+    unless $lyra_call_stack.nil?
+      $lyra_call_stack = $lyra_call_stack.cdr
+    end
+    
+    r
   end
   
   def to_s
     "<#{@ismacro ? "macro" : "function"} #{name}>"
   end
+  
+  def native?
+    false
+  end
+end
+
+class NativeLyraFn < LyraFn
+  def native?
+    true
+  end
 end
 
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
-    entry = Cons.new(name, LyraFn.new(name, false, min_args, max_args, &body))
+    entry = Cons.new(name, NativeLyraFn.new(name, false, min_args, max_args, &body))
     LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
   end
   def add_macro(name, min_args, max_args=min_args, &body)
-    entry = Cons.new(name, LyraFn.new(name, true, min_args, max_args, &body))
+    entry = Cons.new(name, NativeLyraFn.new(name, true, min_args, max_args, &body))
     LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
   end
   def add_var(name, value)
@@ -308,7 +339,6 @@ def evlambda(args_expr, body_expr, ismacro = false)
   max_args = arg_count
 
   if arg_count >= 2
-
     varargs = arg_arr[-2] == :"&"
     if varargs
       last = arg_arr[-1]
@@ -320,7 +350,7 @@ def evlambda(args_expr, body_expr, ismacro = false)
     end
   end
 
-  LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
+  LyraFn.new("", ismacro, arg_count, max_args, args_expr) do |args, environment|
     env1 = append(pairs(args_expr, args), environment)
     eval_keep_last(body_expr, env1)
   end
@@ -361,31 +391,30 @@ def eval_ly(expr, env)
       end
       eval_keep_last(rest(rest(expr)), env1)
     when :quote
-      raise "Too many arguments for quote" unless rest(rest(expr)).nil?
+      raise "Too many arguments for quote." unless rest(rest(expr)).nil?
       second(expr)
     when :"def-macro"
       evdefine(rest(expr), env, true)
     else
       # Find value of symbol in env and call it as a function
       func = eval_ly(first(expr), env)
-      if (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
-        # Tail call possible
-        # TODO
-      else
-      end
-      
-      # vvv Move this code into the `else`-block for non-tail-calls vvv
-      func = eval_ly(func, env) if func.is_a?(Cons)
       args = rest(expr)
-      # TODO Also put argument names on the stack.
-      $lyra_call_stack = Cons.new(func, $lyra_call_stack)
+      func = eval_ly(func, env) if func.is_a?(Cons)
       if func.ismacro
+        #$lyra_call_stack = Cons.new(func, $lyra_call_stack)
         eval_ly(func.call(args, env), env)
       else
+        if (first(expr) == :times)
+          #puts (func == $lyra_call_stack.car) unless $lyra_call_stack.nil?
+        end
         args = eval_list(args, env)
+        if (!func.native?) && (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
+          # Tail call
+          raise TailCall.new(args)
+        end
+        #$lyra_call_stack = Cons.new(func, $lyra_call_stack)
         func.call(args, env)
       end
-      # ^^^ Move this code into the `else`-block for non-tail-calls ^^^
     end
   else
     expr # Atoms evaluate to themselves

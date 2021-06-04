@@ -29,6 +29,9 @@ Function
 `(if <predicate> <then> <else>)` Common if. Executes the predicate. If it is true, evaluates `then`, if not, evaluates `else`.
 
 ```
+Notice! Any functionf marked with '!' should only be used if you know what
+you are doing!
+
 Natively implemented:
 Function | Arity | Description
 ---------+-------+------------------------------------------------------------
@@ -49,6 +52,8 @@ list     | any   | Creates a list ending with nil.
 car      | 1     | Gets the car of a pair.
 cdr      | 1     | Gets the cons of a pair.
 cons     | 2     | Creates a new cons.
+set-car! | 2     | Sets the car of a cons. (Unsafe!)
+set-cdr! | 2     | Sets the cdr of a cons. (Unsafe!)
          |       | 
 null?    | 1     | Checks equality to nil.
 cons?    | 1     | Checks whether the value is a cons.
@@ -74,7 +79,7 @@ env!     | 0     | Gets the current (local) environment. Highly unsafe.
 global-env!| 0   | Like env!, but ignores the local environment. Also unsafe.
 time!    | 0     | Get the current time in seconds as a floating point number.
 
-Untested: sprint!, sread!, slurp!, spit!, env! 
+Untested: sprint!, sread!, slurp!, spit!, env!, set-car!, set-cdr!
 
 Core functions:
 Function | Arity | Description
@@ -83,6 +88,11 @@ empty?   | 1     | Same as null?
 inc      | 1     | Increment a number by 1
 dec      | 1     | Decrement a number by 1
 nth      | 2     | 
+and      | any   | boolean and
+or       | any   | boolean or
+not      | 1     | boolean not
+foldl    | 3     |
+foldr    | 3     |
 print!   | 1     | Prints a string to stdout.
 println! | 1     | Prints a string to stdout followed by a newline.
 read!    | 0     | Reads a string from stdin.
@@ -90,7 +100,7 @@ map      | 2     |
 map!     | 2     | Impure map. Modifies the each element. (!)
 filter   | 2     | 
 
-Untested: filter
+Untested: filter, and, or, not, foldl, foldr, map!
 
 
 Variable | Description

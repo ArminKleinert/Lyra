@@ -6,6 +6,35 @@
 
 (define empty? null?)
 
+(define = p=)
+(define < p<)
+(define > p>)
+(define + p+)
+(define - p-)
+(define * p*)
+(define / p/)
+(define % p%)
+(define & p&)
+(define | p|)
+(define ^ p^)
+
+(def-macro (and x & xs)
+  (if x
+    (if (empty? xs)
+      x
+      (and (first xs) (rest xs)))
+    #f))
+
+(def-macro (or x & xs)
+  (if x
+    #t
+    (if (empty? xs)
+      #f
+      (and (first xs) (rest xs)))))
+
+(define (not x)
+  (if x #f #t))
+
 (define (inc n) (+ n 1))
 (define (dec n) (- n 1))
 
@@ -47,6 +76,16 @@
     (if (f (car xs))
       (cons (car xs) (filter f (cdr xs)))
       (filter f (cdr xs)))))
+
+(define (foldl f start coll)
+  (if (empty? coll)
+    start
+    (foldl f (f start (first coll) (rest coll)))))
+
+(define (foldr f start coll)
+  (if (empty? coll)
+    start
+    (f (first coll) (foldr f start (rest coll)))))
 
 (def-macro (comment & e)
   )

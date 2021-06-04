@@ -18,44 +18,6 @@ class Cons
   def to_s
     elem_to_s(self)
   end
-
-  def first
-    @car
-  end
-  
-  def second
-    @cdr.car
-  end
-  
-  def third
-    @cdr.cdr.car
-  end
-  
-  def fourth
-    @cdr.cdr.cdr.car
-  end
-  
-  def rest
-    @cdr
-  end
-  
-  def nth(i)
-    if i == 0
-      @car
-    elsif !(@cdr.is_a?(Cons))
-      nil
-    else
-      @cdr.nth(i-1)
-    end
-  end
-  
-  def nthrest(i)
-    if i == 0 || @cdr.nil?
-      @cdr
-    else
-      @cdr.nthrest(i-1)
-    end
-  end
   
   def to_a
     rest = @cdr
@@ -66,6 +28,17 @@ class Cons
     end
     result
   end
+end
+
+def first(c); c.car
+end
+def second(c); c.cdr.car
+end
+def third(c); c.cdr.cdr.car
+end
+def fourth(c); c.cdr.cdr.cdr.car
+end
+def rest(c); c.cdr
 end
 
 def list_to_s_helper(cons)
@@ -189,46 +162,47 @@ def setup_core_functions
     LYRA_ENV.cdr = Cons.new(Cons.new(name, value), LYRA_ENV.cdr)
   end
   
-  add_fn(:"=", 2)        { |args, _| args.car == args.second }
+  add_fn(:"p=", 2)        { |args, _| first(args) == second(args) }
   
-  add_fn(:"<", 2)        { |args, _| args.car < args.second }
-  add_fn(:">", 2)        { |args, _| args.car > args.second }
+  add_fn(:"p<", 2)        { |args, _| first(args) < second(args) }
+  add_fn(:"p>", 2)        { |args, _| first(args) > second(args) }
   
-  add_fn(:"+", 2)        { |args, _| args.car + args.second }
-  add_fn(:"-", 2)        { |args, _| args.car - args.second }
-  add_fn(:"*", 2)        { |args, _| args.car * args.second }
-  add_fn(:"/", 2)        { |args, _| args.car / args.second }
-  add_fn(:"%", 2)        { |args, _| args.car % args.second }
+  add_fn(:"p+", 2)        { |args, _| first(args) + second(args) }
+  add_fn(:"p-", 2)        { |args, _| first(args) - second(args) }
+  add_fn(:"p*", 2)        { |args, _| first(args) * second(args) }
+  add_fn(:"p/", 2)        { |args, _| first(args) / second(args) }
+  add_fn(:"p%", 2)        { |args, _| first(args) % second(args) }
   
-  add_fn(:"&", 2)        { |args, _| args.car & args.second }
-  add_fn(:"|", 2)        { |args, _| args.car | args.second }
-  add_fn(:"^", 2)        { |args, _| args.car ^ args.second }
-  add_fn(:"**", 2)       { |args, _| args.car ** args.second }
+  add_fn(:"p&", 2)        { |args, _| first(args) & second(args) }
+  add_fn(:"p|", 2)        { |args, _| first(args) | second(args) }
+  add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) }
   
   add_fn(:"list", -1)    { |args, _| args }
-  add_fn(:"car", 1)      { |args, _| args.car.car }
-  add_fn(:"cdr", 1)      { |args, _| args.car.cdr }
-  add_fn(:"cons", 2)     { |args, _| Cons.new(args.car, args.second) }
+  add_fn(:"car", 1)      { |args, _| first(args).car }
+  add_fn(:"cdr", 1)      { |args, _| first(args).cdr }
+  add_fn(:"cons", 2)     { |args, _| Cons.new(first(args), second(args)) }
+  add_fn(:"set-car!", 2) { |args, _| first(args).car = second(args) }
+  add_fn(:"set-cdr!", 2) { |args, _| first(args).cdr = second(args) }
 
-  add_fn(:"null?", 1)    { |args, _| args.car.nil? }
-  add_fn(:"cons?", 1)    { |args, _| args.car.is_a?(Cons)}
-  add_fn(:"int?", 1)     { |args, _| args.car.is_a?(Integer)}
-  add_fn(:"float?", 1)   { |args, _| args.car.is_a?(Float)}
-  add_fn(:"string?", 1)  { |args, _| args.car.is_a?(String)}
+  add_fn(:"null?", 1)    { |args, _| first(args).nil? }
+  add_fn(:"cons?", 1)    { |args, _| first(args).is_a?(Cons)}
+  add_fn(:"int?", 1)     { |args, _| first(args).is_a?(Integer)}
+  add_fn(:"float?", 1)   { |args, _| first(args).is_a?(Float)}
+  add_fn(:"string?", 1)  { |args, _| first(args).is_a?(String)}
   
-  add_fn(:"int", 1)      { |args, _| args.car.to_i }
-  add_fn(:"float", 1)    { |args, _| args.car.to_f }
-  add_fn(:"string", 1)   { |args, _| args.car.to_s }
-  add_fn(:"bool", 1)     { |args, _| !!args.car }
+  add_fn(:"int", 1)      { |args, _| first(args).to_i }
+  add_fn(:"float", 1)    { |args, _| first(args).to_f }
+  add_fn(:"string", 1)   { |args, _| first(args).to_s }
+  add_fn(:"bool", 1)     { |args, _| !!first(args) }
   
-  add_fn(:"sprint!", 2)  { |args, _| e = e.is_a?(String) ? args.second : elem_to_s(args.second)
-                              args.car.print(e)}
-  add_fn(:"sread!", 1)   { |args, _| args.car.gets }
-  add_fn(:"slurp!", 1)   { |args, _| IO.read(args.car) }
-  add_fn(:"spit!", 2)    { |args, _| IO.write(args.car, args.second) }
+  add_fn(:"sprint!", 2)  { |args, _| e = e.is_a?(String) ? second(args) : elem_to_s(second(args))
+                              first(args).print(e)}
+  add_fn(:"sread!", 1)   { |args, _| first(args).gets }
+  add_fn(:"slurp!", 1)   { |args, _| IO.read(first(args)) }
+  add_fn(:"spit!", 2)    { |args, _| IO.write(first(args), second(args)) }
   
-  add_fn(:"eval!", 1)    { |args, env| eval_keep_last(args.car, env) }
-  add_fn(:"parse", 1)    { |args, env| s = args.car
+  add_fn(:"eval!", 1)    { |args, env| eval_keep_last(first(args), env) }
+  add_fn(:"parse", 1)    { |args, env| s = first(args)
                                        make_ast(tokenize(s)) }
   add_fn(:"env!", 0)     { |_, env| env }
   add_fn(:"global-env!", 0) { |_, _| LYRA_ENV }
@@ -260,9 +234,9 @@ def pairs(cons0, cons1)
   if cons0.nil? || cons1.nil?
     nil
   elsif cons0.cdr.nil? && !(cons1.cdr.nil?)
-    Cons.new(Cons.new(cons0.car, cons1), nil)
+    Cons.new(Cons.new(first(cons0), cons1), nil)
   else
-    Cons.new(Cons.new(cons0.car, cons1.car), pairs(cons0.cdr, cons1.cdr))
+    Cons.new(Cons.new(first(cons0), first(cons1)), pairs(cons0.cdr, cons1.cdr))
   end
 end
 
@@ -291,7 +265,7 @@ def append(c0, c1)
   if c0.nil?
     c1
   else
-    Cons.new(c0.car, append(c0.cdr, c1))
+    Cons.new(first(c0), append(c0.cdr, c1))
   end
 end
 
@@ -301,7 +275,7 @@ def eval_list(expr_list, env)
   if expr_list.nil?
     nil
   else
-    Cons.new(eval_ly(expr_list.car, env), eval_list(expr_list.cdr, env))
+    Cons.new(eval_ly(first(expr_list), env), eval_list(rest(expr_list), env))
   end
 end
 
@@ -309,11 +283,11 @@ end
 def eval_keep_last(expr_list, env)
   if expr_list.nil?
     nil
-  elsif expr_list.cdr.nil?
-    eval_ly(expr_list.car, env)
+  elsif rest(expr_list).nil?
+    eval_ly(first(expr_list), env)
   else
-    eval_ly(expr_list.car, env)
-    eval_keep_last(expr_list.cdr, env)
+    eval_ly(first(expr_list), env)
+    eval_keep_last(rest(expr_list), env)
   end
 end
 
@@ -323,36 +297,24 @@ end
 def evdefine(expr, env, ismacro)
   name = nil
   res = nil
-  if expr.first.is_a?(Cons)
+  if first(expr).is_a?(Cons)
     # Form is `(define (...) ...)` (Function definition)
-    name = expr.first.first
-    args_expr = expr.first.rest
-    body = expr.rest
+    name = first(first(expr))
+    args_expr = rest(first(expr))
+    body = rest(expr)
 
     res = evlambda(args_expr, body, ismacro)
 
     res.name = name
   else
     # Form is `(define .. ...)` (Variable definition)
-    name = expr.first
-    val = expr.second
+    name = first(expr)
+    val = second(expr)
     res = eval_ly(val, env)
   end
   entry = Cons.new(name, res)
   LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr) # Put new entry into global LYRA_ENV
   res
-end
-
-def last2(c)
-  if c.nil?
-    Cons.new(nil,nil)
-  elsif c.cdr.nil?
-    c
-  elsif c.cdr.cdr.nil?
-    c
-  else
-    last2(c.cdr)
-  end
 end
 
 # args_expr has the format `(args...)`
@@ -388,34 +350,34 @@ def eval_ly(expr, env)
   elsif expr.is_a?(Symbol)
     associated(expr, env) # Get associated value from env
   elsif expr.is_a?(Cons)
-    case expr.car
+    case first(expr)
     when :if
-      if eval_ly(expr.second, env)
-        eval_ly(expr.third, env)
+      if eval_ly(second(expr), env)
+        eval_ly(third(expr), env)
       else
-        eval_ly(expr.fourth, env)
+        eval_ly(fourth(expr), env)
       end
     when :lambda
-      args_expr = expr.second
-      body_expr = expr.cdr.cdr
+      args_expr = second(expr)
+      body_expr = rest(rest(expr))
       evlambda(args_expr, body_expr)
     when :define
-      evdefine(expr.cdr, env, false)
+      evdefine(rest(expr), env, false)
     when :"let*"
-      name = expr.second.car
-      val = eval_ly(expr.second.second, env)
+      name = first(second(expr))
+      val = eval_ly(second(second(expr)), env)
       env1 = Cons.new(Cons.new(name, val), env)
-      eval_keep_last(expr.cdr.cdr, env1)
+      eval_keep_last(rest(rest(expr)), env1)
     when :quote
-      raise "Too many arguments for quote" unless expr.cdr.cdr.nil?
-      expr.second
+      raise "Too many arguments for quote" unless rest(rest(expr)).nil?
+      second(expr)
     when :"def-macro"
-      evdefine(expr.cdr, env, true)
+      evdefine(rest(expr), env, true)
     else
       # Find value of symbol in env and call it as a function
-      func = eval_ly(expr.car, env)
+      func = eval_ly(first(expr), env)
       func = eval_ly(func, env) if func.is_a?(Cons)
-      args = expr.cdr
+      args = rest(expr)
       if func.ismacro
         eval_ly(func.call(args, env), env)
       else

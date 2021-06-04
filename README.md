@@ -35,6 +35,10 @@ you are doing!
 Natively implemented:
 Function | Arity | Description
 ---------+-------+------------------------------------------------------------
+define   | any   | Adds a variable or function to the global (!) environment.
+lambda   | any   | Creates a new anonymous function.
+let*     | any   | Adds a single variable to the local environment.
+         |       |
 =        | 2     | Checks 2 values for equality.
 <        | 2     | Checks whether the first argument is less than the second.
 >        | 2     | Checks whether the second argument is less than the first.

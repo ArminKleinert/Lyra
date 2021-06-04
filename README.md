@@ -89,7 +89,7 @@ Core functions:
 Function             | Arity | Description
 ---------------------+-------+------------------------------------------------------------
 eq?                  | 2     | Alias for =
-eql?                  | 2     | Alias for =
+eql?                 | 2     | Alias for =
 <=                   | 2     | Less than or equal to.
 >=                   | 2     | Greater than or equal to.
 load!                | 1     | Imports another source file by filename.

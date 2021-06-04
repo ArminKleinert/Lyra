@@ -42,10 +42,10 @@
 
 ; and
 (def-macro (and x y)
-  (if x y #f))
+  (list 'if x y #f))
 
 (def-macro (or x y)
-  (if x #t y))
+  (list 'if x #t y))
 
 (define (not x)
   (if x #f #t))
@@ -118,9 +118,9 @@
       (if (= (car (car env)) sym)
         (if found
           (begin
-            (set-car! env (car (cdr env)))
-            (set-cdr! env (cdr (cdr env))))
-          (let* (v (car (car env)))
+            (set-car! (car env) (car (cdr env)))
+            (set-cdr! (car env) (cdr (cdr env))))
+          (let* (v (cdr (car env)))
             (set-car! env (car (cdr env)))
             (set-cdr! env (cdr (cdr env)))
             (deprioritise-helper! (cdr env) sym v #t)))
@@ -150,23 +150,45 @@
 
 (define nothing '())
 
-(comment
+
+(define (printall! cs)
+  (if (empty? cs)
+    '()
+    (begin
+      (println! (car cs))
+      (printall! (cdr cs)))))
 
 (println! (index-in-env! 'nothing))
 (deprioritise! 'nothing)
 (println! (index-in-env! 'nothing))
 (deprioritise! 'nothing)
 (println! (index-in-env! 'nothing))
+
+(define (times n f)
+  (if (<= n 1)
+    (f)
+    (begin
+      (f)
+      (times (dec n) f))))
+
+(comment
 
 (println!
   (measure 1000
     (lambda ()
-      ;(index-in-env! 'nothing)
+      (last-entry (global-env!)))))
+
+(println!
+  (times
+    10
+    (lambda ()
       (last-entry (global-env!)))))
 )
 
+(define (crash)
+  (crash))
 
-
+(crash)
 
 
 

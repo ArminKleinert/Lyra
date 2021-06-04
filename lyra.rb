@@ -6,22 +6,25 @@
 # [^\s\[\]{}('"`,;)]* Everything else
 RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
 
-class Cons 
-  attr_accessor :car
-  attr_accessor :cdr
-  
-  def initialize(car, cdr)
-    @car = car
-    @cdr = cdr
+
+Cons = Struct.new(:car, :cdr) do
+  def list_to_s_helper()
+    if cdr.nil?
+      car.to_s
+    elsif @cdr.is_a?(Cons)
+      car.to_s´ + " " + cdr.list_to_s_helper
+    else
+      car.to_s + " . " + cdr.to_s
+    end
   end
   
   def to_s
-    elem_to_s(self)
+    "(" + list_to_s_helper() + ")"
   end
   
   def to_a
-    rest = @cdr
-    result = [@car]
+    rest = cdr
+    result = [car]
     while rest.is_a?(Cons)
       result << rest.car
       rest = rest.cdr
@@ -39,28 +42,6 @@ end
 def fourth(c); c.cdr.cdr.cdr.car
 end
 def rest(c); c.cdr
-end
-
-def list_to_s_helper(cons)
-  if cons.cdr.nil?
-    elem_to_s(cons.car)
-  elsif cons.cdr.is_a?(Cons)
-    elem_to_s(cons.car) + " " + list_to_s_helper(cons.cdr)
-  else
-    elem_to_s(cons.car) + " . " + elem_to_s(cons.cdr)
-  end
-end
-
-def list_to_s(cons)
-  "(" + list_to_s_helper(cons) + ")"
-end
-
-def elem_to_s(e)
-  if e.is_a? Cons
-    list_to_s(e)
-  else
-    e.to_s
-  end
 end
 
 def tokenize(s)
@@ -146,7 +127,7 @@ class LyraFn < Proc
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
     begin
-    body.call(args, env)
+      body.call(args, env)
     rescue RuntimeError
       $stderr.puts "#{@name} failed with error: #{$!}"
       raise
@@ -170,22 +151,22 @@ def setup_core_functions
   def add_var(name, value)
     LYRA_ENV.cdr = Cons.new(Cons.new(name, value), LYRA_ENV.cdr)
   end
-  
+
   add_fn(:"p=", 2)        { |args, _| first(args) == second(args) }
-  
+
   add_fn(:"p<", 2)        { |args, _| first(args) < second(args) }
   add_fn(:"p>", 2)        { |args, _| first(args) > second(args) }
-  
+
   add_fn(:"p+", 2)        { |args, _| first(args) + second(args) }
   add_fn(:"p-", 2)        { |args, _| first(args) - second(args) }
   add_fn(:"p*", 2)        { |args, _| first(args) * second(args) }
   add_fn(:"p/", 2)        { |args, _| first(args) / second(args) }
   add_fn(:"p%", 2)        { |args, _| first(args) % second(args) }
-  
+
   add_fn(:"p&", 2)        { |args, _| first(args) & second(args) }
   add_fn(:"p|", 2)        { |args, _| first(args) | second(args) }
   add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) }
-  
+
   add_fn(:list, -1)       { |args, _| args }
   add_fn(:car, 1)         { |args, _| first(args).car }
   add_fn(:cdr, 1)         { |args, _| first(args).cdr }
@@ -198,14 +179,14 @@ def setup_core_functions
   add_fn(:int?, 1)        { |args, _| first(args).is_a?(Integer)}
   add_fn(:float?, 1)      { |args, _| first(args).is_a?(Float)}
   add_fn(:string?, 1)     { |args, _| first(args).is_a?(String)}
-  
+
   add_fn(:int, 1)         { |args, _| first(args).to_i }
   add_fn(:float, 1)       { |args, _| first(args).to_f }
   add_fn(:string, 1)      { |args, _| first(args).to_s }
   add_fn(:bool, 1)        { |args, _| !!first(args) }
-  
+
   add_fn(:sprint!, 2)     { |args, _|
-                            e = e.is_a?(String) ? second(args) : elem_to_s(second(args))
+                            e = e.is_a?(String) ? second(args) : second(args)
                             first(args).print(e)}
   add_fn(:sread!, 1)      { |args, _| first(args).gets }
   add_fn(:slurp!, 1)      { |args, _| IO.read(first(args)) }
@@ -224,13 +205,13 @@ def setup_core_functions
                             first(args).times do |_|
                               second(args).call(nil, env)
                             end
-                            Time.now-t }
+                            Time.now - t }
 
   add_var(:stdin, $stdin)
   add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
   add_var(:NIL, list())
-  
+
   true
 end
 
@@ -266,7 +247,7 @@ end
 # Search environment for symbol
 def associated(x, env)
   if env.nil?
-    raise "Symbol not found: #{elem_to_s(x)}"
+    raise "Symbol not found: #{x}"
   elsif env.car.nil?
     # Divider between local and global environments
     associated(x, env.cdr)

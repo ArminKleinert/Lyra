@@ -168,7 +168,7 @@
       (times (dec n) f))))
 
 (println!
-  (measure 200
+  (measure 1000
     (lambda ()
       (deprioritise! 'nothing)
       (index-in-env! 'nothing))))

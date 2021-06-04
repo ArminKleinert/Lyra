@@ -227,7 +227,6 @@ def setup_core_functions
   add_var(:stdin, $stdin)
   add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
-  add_var(:NIL, list())
 
   true
 end

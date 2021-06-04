@@ -11,11 +11,11 @@ Lyra is a lisp I make for fun and learning.
 
 ## Types:
 
-Basic numbers: Integer, Float  
-String  
-Cons (car, cdr)  
-Boolean (#t, #f)  
-Function  
+- Basic numbers: Integer, Float  
+- String  
+- Cons (car, cdr)  
+- Boolean (#t, #f)  
+- Function  
 
 ## Basic commands:
 
@@ -143,6 +143,8 @@ nil      | Alias for '().
 ```
 
 ## Missing features:
+
+Tail-recursion (But I am working on it.)
 
 Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.
 

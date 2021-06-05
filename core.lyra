@@ -6,16 +6,37 @@
 (define require! load!)
 (define import! load!)
 
+; Boolean and
+(def-macro (and x y)
+  (list 'if x y #f))
+
+; Boolean or
+(def-macro (or x y)
+  (list 'if x #t y))
+
+; Negate boolean
+(define (not x)
+  (if x #f #t))
+
 ; This macro ignores its body and returns nil.
 (def-macro (comment & e)
   )
 
-(define empty? null?)
+(define (empty? l)
+  (if (vector? l)
+    (= (vector-size l) 0)
+    (null? l)))
+
 (define nil '())
+
+(define (atom? e)
+  (if (null? e) #f
+  (if (vector? e) #f
+  (if (cons? e) #f #t))))
 
 ; Operators. These can later be expanded for other types.
 ; Maybe we could add conses or vectors or strings together?
-(define = p=)
+(define (= e0 e1))
 (define eq? p=)
 (define eql? p=)
 (define < p<)
@@ -32,16 +53,33 @@
 (define >> p>>)
 
 ; Accessors for conses
-(define first car)
-(define (second c) (car (cdr c)))
-(define (third c) (car (cdr (cdr c))))
-(define (rest c) (cdr c))
+(define (first c) (if (vector? c) (vector-get v 0) (car c)))
+(define (second c) (if (vector? c) (vector-get v 1) (car (cdr c))))
+(define (third c) (if (vector? c) (vector-get v 2) (car (cdr (cdr c)))))
+(define (rest c) (if (vector? c) (cpy-vector v 1 (dec (vector-size v))) (cdr c)))
+
+(define (cpy-vector v start end)
+  (let* (iter (lambda (i nv)
+          (if (> i end)
+            nv
+            (iter (inc i) (vector-append! nv (vector-get v i))))))
+    (iter start (vector))))
 
 ; Fold left.
-(define (foldl f start coll)
+(define (vfoldl f start v)
+  (let* (iter (lambda (i val)
+          (if (= i (vector-size v))
+            val
+            (iter (inc i) (f val (vector-get v i))))))
+    (iter 0 start)))
+
+(define (cfoldl f start coll)
   (if (empty? coll)
     start
     (foldl f (f start (first coll)) (rest coll))))
+
+(define (foldl f start coll)
+  (if (vector? coll) (vfoldl f start v) (cfoldl f start coll)))
 
 ; Reduce is just an alias for foldl.
 (define reduce foldl)
@@ -52,18 +90,6 @@
     start
     (f (first coll) (foldr f start (rest coll)))))
 
-; Boolean and
-(def-macro (and x y)
-  (list 'if x y #f))
-
-; Boolean or
-(def-macro (or x y)
-  (list 'if x #t y))
-
-; Negate boolean
-(define (not x)
-  (if x #f #t))
-
 (define (<= x y) (or (< x y) (= x y)))
 (define (>= x y) (or (> x y) (= x y)))
 
@@ -72,8 +98,12 @@
 
 ; Length of cons
 (define (length c)
-  (let* (addone (lambda (n m) (inc n)))
-    (foldl addone 0 c)))
+  (if (vector? c)
+    (vector-size c)
+  (if (cons? c)
+    (let* (addone (lambda (n m) (inc n)))
+      (foldl addone 0 c))
+    0)))
 
 ; Get the nth element from a list.
 (define (nth xs index)
@@ -100,12 +130,26 @@
 (define (begin e0 e1)
   (if e0 e1 e1))
 
-; Executes a function f on each element of a list xs
-; and returns a new list.
-(define (map f xs)
+(define (map-vector f v)
+  (let* (iter-fn (lambda (i nv)
+                    (if (= (vector-size v) i)
+                      nv
+                      (begin
+                        (vector-append! nv (f (vector-get v i)))
+                        (iter-fn (inc i) nv)))))
+  (iter-fn 0 (vector))))
+  
+(define (map-list f xs)
   (if (null? xs)
     '()
     (cons (f (car xs)) (map f (cdr xs)))))
+
+; Executes a function f on each element of a list xs
+; and returns a new list.
+(define (map f xs)
+  (if (vector? xs)
+    (map-vector f xs)
+    (map-list f xs)))
 
 ; Like map, but works in place.
 (define (map! f xs)
@@ -116,12 +160,27 @@
       (map! f (cdr xs))))))
 
 ; Filter a list xs by a predicate f.
-(define (filter f xs)
+
+(define (filter-vector f v)
+  (let* (iter (lambda (i nv)
+          (if (= i (vector-size v))
+            nv
+            (if (f (vector-get v i))
+              (begin
+                (vector-append! nv (vector-get v i))
+                (iter (inc i) nv))
+              (iter (inc i) nv)))))
+    (iter 0 (vector))))
+
+(define (filter-list f xs)
   (if (null? xs)
     '()
     (if (f (car xs))
       (cons (car xs) (filter f (cdr xs)))
       (filter f (cdr xs)))))
+
+(define (filter f xs)
+  (if (vector? xs) (filter-vector f xs) (filter-list f xs)))
 
 ; Returns the last entry of a list.
 (define (last-entry cs)
@@ -194,17 +253,51 @@
 
 ; Appends a list to another.
 ; The complexity depends on the length of the first list.
-(define (append c0 c1)
+(define (append-list c0 c1)
   (if (empty? c0)
     c1
-    (cons (car c0) (append (cdr c0) c1))))
+    (cons (first c0) (append (rest c0) c1))))
+
+(define (vector-append-multi v0 v1)
+  (let* (iter (lambda (i nv)
+          (if (= i (vector-size v1))
+            nv
+            (iter (inc i) (vector-append! nv (vector-get v1 i))))))
+    (iter 0 (cpy-vector v0 0 (dec (vector-size v0))))))
+
+(define (append c0 c1)
+  (if (vector? c0)
+    (vector-append-multi c0 c1)
+    (append-list c0 c1)))
+
+(define (even? n)
+  (= (% n 2) 0))
+
+(define (list->vector ls)
+  (foldl (lambda (v x) (vector-append! v x)) (vector) ls))
 
 ;;;
 ; Tests from here.
 ;;;
 
+(let* (v (vector 1 2 3 4 5))
+  ;(println! (map-vector inc v))
+  ;(println! (filter-vector even? (map-vector inc v)))
+  (println! (list->vector (list 1 3 5 7 9)))
+  (println! (empty? v))
+  (println! (empty? (vector)))
+  (println! (vector-append-multi (vector 1 2 3) (vector 3 4 5)))
+  (println! (rest v))
+  (println! (foldl + 0 v)))
 
-
-
-
+(comment
+(let* (v (vector 1 2 3 4 5))
+  (println! (even? 0))
+  (println! (even? 16))
+  (println! (even? 3))
+  (println! (even? (vector-get v 1)))
+  (println! (even? (vector-get v 4)))
+  
+  (println! (filter-vector even? v)))
+)
 

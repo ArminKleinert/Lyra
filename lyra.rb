@@ -201,13 +201,19 @@ def setup_core_functions
   add_fn(:cons, 2)        { |args, _| Cons.new(first(args), second(args)) }
   add_fn(:"set-car!", 2)  { |args, _| first(args).car = second(args) }
   add_fn(:"set-cdr!", 2)  { |args, _| first(args).cdr = second(args) }
-  #add_fn(:"plen", 1)      { |args, _| list_len(first(args)) }
+  
+  add_fn(:vector, -1)     { |args, _| args.to_a }
+  add_fn(:"vector-get", 2){ |args, _| first(args)[second(args)] }
+  add_fn(:"vector-set!", 3){|args, _| first(args)[second(args)] = third(args) }
+  add_fn(:"vector-append!", 2){ |args, _| first(args) << second(args); first(args) }
+  add_fn(:"vector-size", 1){|args, _| first(args).size }
 
   add_fn(:null?, 1)       { |args, _| first(args).nil? }
   add_fn(:cons?, 1)       { |args, _| first(args).is_a?(Cons)}
   add_fn(:int?, 1)        { |args, _| first(args).is_a?(Integer)}
   add_fn(:float?, 1)      { |args, _| first(args).is_a?(Float)}
   add_fn(:string?, 1)     { |args, _| first(args).is_a?(String)}
+  add_fn(:vector?, 1)     { |args, _| first(args).is_a?(Array)}
 
   add_fn(:int, 1)         { |args, _| first(args).to_i }
   add_fn(:float, 1)       { |args, _| first(args).to_f }

@@ -127,7 +127,7 @@
     cs
     (if (empty? (cdr cs))
       cs
-      (last-entry (cdr cs))))
+      (last-entry (cdr cs)))))
 
 ; Do not call directly. This should only be called by deprioritise!.
 (define (deprioritise-helper! env sym val found)
@@ -207,7 +207,7 @@
     '()
     (cons n (range (inc n) m))))
 
-(let* (longvar (range 0 1000))
+(let* (longvar (range 0 100000))
   (println!
     (measure 10
       (lambda ()

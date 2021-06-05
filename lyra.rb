@@ -1,11 +1,5 @@
 
-# [\s,]* Whitespace
-# [()'] Matches (, ), '
-# "(?:\\.|[^\\"])*"? Matches 0 or 1 string
-# ;.* Matches comment and rest or line
-# [^\s\[\]{}('"`,;)]* Everything else
-RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
-
+# Definition of conses
 Cons = Struct.new(:car, :cdr) do
   def list_to_s_helper()
     if cdr.nil?
@@ -21,6 +15,7 @@ Cons = Struct.new(:car, :cdr) do
     "(" + list_to_s_helper() + ")"
   end
   
+  # Not necessary, just for ease of use.
   def to_a
     rest = cdr
     result = [car]
@@ -32,6 +27,7 @@ Cons = Struct.new(:car, :cdr) do
   end
 end
 
+# Convenience functions.
 def first(c); c.car
 end
 def second(c); c.cdr.car
@@ -43,10 +39,20 @@ end
 def rest(c); c.cdr
 end
 
+# TODO Update description
+# [\s,]* Whitespace
+# [()'] Matches (, ), '
+# "(?:\\.|[^\\"])*"? Matches 0 or 1 string
+# ;.* Matches comment and rest or line
+# [^\s\[\]{}('"`,;)]* Everything else
+RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
+
+# Scan the text using RE, remove empty tokens and remove comments.
 def tokenize(s)
   s.scan(RE).flatten.reject{|s| s.empty? || s.start_with?(";")}
 end
 
+# Creates a list of cons-cells from a Ruby-Array.
 def list(*args)
   if args.empty?
     nil
@@ -55,10 +61,17 @@ def list(*args)
   end
 end
 
+# Un-escapes a string and removed the '"' from beginning and end..
 def parse_str(token)
   token.gsub(/\\./, {"\\\\" => "\\", "\\n" => "\n", "\\\"" => '"'})[1..-2]
 end
 
+# Builds the abstract syntax tree and converts all expressions into their
+# types.
+# For example, if a token is recognized as a bool, it is parsed into
+# a bool, a string becomes a string, etc.
+# If an `(` is found, a cons is opened. It is closed when a `)` is 
+# encountered.
 def make_ast(tokens, level=0)
   root = []
   while (t = tokens.shift) != nil
@@ -87,6 +100,7 @@ def make_ast(tokens, level=0)
   list(*root)
 end
 
+# Get the length of a list. Might be removed in the future.
 def list_len(cons, n=0)
   unless cons.is_a?(Cons)
     n
@@ -95,6 +109,7 @@ def list_len(cons, n=0)
   end
 end
 
+# Thrown when a tail-call should be done.
 class TailCall < StandardError
   attr_reader :args
   def initialize(args)
@@ -102,32 +117,36 @@ class TailCall < StandardError
   end
 end
 
+# A Lyra-function. It knows its argument-count (minimum and maximum),
+# body (the executable function), name and whether it is a macro or not.
 class LyraFn < Proc
-  attr_reader :arg_counts
-  attr_reader :body
-  attr_accessor :name
-  attr_reader :ismacro
-  attr_reader :arg_names
+  attr_reader :arg_counts # Range of (minimum .. maximum)
+  attr_reader :body # Executable
+  attr_accessor :name # Symbol
+  attr_reader :ismacro # Boolean
   
-  def initialize(name, ismacro, min_args, max_args=min_args, arg_names=nil, &body)
+  def initialize(name, ismacro, min_args, max_args=min_args, &body)
     @arg_counts = (min_args .. max_args)
     @body = body
     @name = name
     @ismacro = ismacro
-    @arg_names = arg_names
   end
   
   def call(args, env)
+    # Check argument counts
     args_given = list_len(args)
     raise "#{@name}: Too few arguments. (Given #{args_given}, expected #{@arg_counts})" if args_given < arg_counts.first
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
+    # Add the function to the lyra-callstack.
     $lyra_call_stack = Cons.new(self, $lyra_call_stack)
     
     begin
+      # Execute the body.
       r = body.call(args, env)
     rescue TailCall => tailcall
       unless native?
+        # Do a tail-call. (Thanks for providing `retry`, Ruby!)
         args = tailcall.args
         retry
       end
@@ -136,10 +155,10 @@ class LyraFn < Proc
       raise
     end
     
-    unless $lyra_call_stack.nil?
-      $lyra_call_stack = $lyra_call_stack.cdr
-    end
+    # Remove from the callstack.
+    $lyra_call_stack = $lyra_call_stack.cdr
     
+    # Return
     r
   end
   
@@ -158,13 +177,12 @@ class NativeLyraFn < LyraFn
   end
 end
 
+# Sets up the core functions and variables. The functions defined here are
+# of the type NativeLyraFn instead of LyraFn. They can not make use of tail-
+# recursion and are supposed to be very simple.
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
     entry = Cons.new(name, NativeLyraFn.new(name, false, min_args, max_args, &body))
-    LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
-  end
-  def add_macro(name, min_args, max_args=min_args, &body)
-    entry = Cons.new(name, NativeLyraFn.new(name, true, min_args, max_args, &body))
     LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
   end
   def add_var(name, value)
@@ -172,7 +190,6 @@ def setup_core_functions
   end
 
   add_fn(:"p=", 2)        { |args, _| first(args) == second(args) }
-
   add_fn(:"p<", 2)        { |args, _| first(args) < second(args) }
   add_fn(:"p>", 2)        { |args, _| first(args) > second(args) }
 
@@ -231,24 +248,34 @@ def setup_core_functions
   true
 end
 
-# nil is not a valid pair but will be used as a separator between local LYRA_ENV
-# and global LYRA_ENV.
+# nil is not a valid pair but will be used as a separator between
+# local LYRA_ENV and global LYRA_ENV.
 unless  Object.const_defined?(:LYRA_ENV)
   LYRA_ENV = Cons.new(nil,nil)
   $lyra_call_stack = nil # Also handled as a cons
   setup_core_functions()
 end
 
+# Parses and evaluates a string as Lyra-source code.
 def evalstr(s, env=LYRA_ENV)
   ast = make_ast(tokenize(s))
   eval_keep_last(ast, env)
 end
 
 # Turns 2 lists into a combined one.
-# pairs(list(1,2,3), list(4,5,6)) => ((1 . 4) (2 . 5) (3 . 6))
+#   `pairs(list(1,2,3), list(4,5,6)) => ((1 . 4) (2 . 5) (3 . 6))`
+# If the first list is longer than the second, all remaining 
+# elements from the second are added the value for the last element
+# of the first list:
+#   `pairs(list(1,2,3), list(4,5,6,7)) => ((1 . 4) (2 . 5) (3 6 7))`
+# The intended use for this function is for adding function arguments
+# to the environment. The latter case makes it easy to pass
+# variadic arguments.
 def pairs(cons0, cons1)
-  if cons0.nil? || cons1.nil?
+  if cons0.nil?
     nil
+  elsif cons1.nil?
+    Cons.new(Cons.new(first(cons0), nil), pairs(cons0.cdr, nil))
   elsif cons0.cdr.nil? && !(cons1.cdr.nil?)
     Cons.new(Cons.new(first(cons0), cons1), nil)
   else
@@ -272,8 +299,8 @@ def associated(x, env)
   end
 end
 
-# Append two lists
-# Complexity depends on the first list
+# Append two lists. Complexity depends on the first list.
+# TODO Potential candidate for optimization?
 def append(c0, c1)
   if c0.nil?
     c1
@@ -283,7 +310,8 @@ def append(c0, c1)
 end
 
 # Takes a Cons (list of expressions), calls eval_ly on each element
-# and return a new list
+# and return a new list.
+# TODO Potential candidate for optimization?
 def eval_list(expr_list, env)
   if expr_list.nil?
     nil
@@ -292,21 +320,24 @@ def eval_list(expr_list, env)
   end
 end
 
-# Similar to eval_list, but only returns the last evaluated value
+# Similar to eval_list, but only returns the last evaluated value.
+# TODO Potential candidate for optimization?
 def eval_keep_last(expr_list, env)
   if expr_list.nil?
+    # No expressions in the list -> Just return nil
     nil
   elsif rest(expr_list).nil?
+    # Only one expression left -> Execute it and return.
     eval_ly(first(expr_list), env)
   else
+    # At least 2 expressions left -> Execute the first and recurse
     eval_ly(first(expr_list), env)
     eval_keep_last(rest(expr_list), env)
   end
 end
 
 # Defines a new function or variable and puts it into the global LYRA_ENV.
-# If `ismacro` is true, the function will not evaluate its
-# arguments right away.
+# If `ismacro` is true, the function will not evaluate its arguments right away.
 def evdefine(expr, env, ismacro)
   name = nil
   res = nil
@@ -316,18 +347,22 @@ def evdefine(expr, env, ismacro)
     args_expr = rest(first(expr))
     body = rest(expr)
 
+    # Create the function
     res = evlambda(args_expr, body, ismacro)
-
     res.name = name
   else
     # Form is `(define .. ...)` (Variable definition)
-    name = first(expr)
+    name = first(expr) # Get the name
     val = second(expr)
-    res = eval_ly(val, env)
+    res = eval_ly(val, env) # Get and evaluate the value.
   end
+  # Create an entry with the name and value.
   entry = Cons.new(name, res)
-  LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr) # Put new entry into global LYRA_ENV
-  res
+  
+  # Add the entry to the global environment.
+  LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr)
+  
+  name
 end
 
 # args_expr has the format `(args...)`
@@ -337,20 +372,32 @@ def evlambda(args_expr, body_expr, ismacro = false)
   arg_count = arg_arr.size
   max_args = arg_count
 
+  # Check for variadic arguments.
+  # The arguments of a function are variadic if the second to last
+  # symbol in the argument list is `&`.
   if arg_count >= 2
     varargs = arg_arr[-2] == :"&"
     if varargs
-      last = arg_arr[-1]
+      # Remove the `&` from the arguments.
+      last = arg_arr[-1] 
       arg_arr = arg_arr[0 .. -3]
       arg_arr << last
       args_expr = list(*arg_arr)
+      
+      # Set the new argument numbers for minimum
+      # and maximum number of arguments.
+      # -1 means infinite.
       max_args = -1
       arg_count -= 1
     end
   end
 
-  LyraFn.new("", ismacro, arg_count, max_args, args_expr) do |args, environment|
+  LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
+    # Makes pairs of the argument names and given arguments and
+    # adds these pairs to the local environment.
     env1 = append(pairs(args_expr, args), environment)
+    # Execute all commands in the body and return the last
+    # value.
     eval_keep_last(body_expr, env1)
   end
 end
@@ -362,25 +409,56 @@ def eval_ly(expr, env)
   elsif expr.is_a?(Symbol)
     associated(expr, env) # Get associated value from env
   elsif expr.is_a?(Cons)
+    # The expression is a cons and probably starts with a symbol.
+    # The evaluate function will try to treat the symbol as a function
+    # and execute it.
+    # If the cons is empty or does not start with a symbol, an error
+    # is thrown.
+    # TODO: Error if not starting with a symbol
+    
+    # Try to match the symbol.
     case first(expr)
     when :if
+      # Form is `(if predicate then-branch else-branch)`.
+      # If the predicate holds true, the then-branch is executed.
+      # Otherwise, the else-branch is executed.
+      # TODO: Check arity
       if eval_ly(second(expr), env)
+        # The predicate was true
         eval_ly(third(expr), env)
       else
+        # The predicate was not true
         eval_ly(fourth(expr), env)
       end
     when :lambda
+      # Defines an anonymous function.
+      # Form: `(lambda (arg0 arg1 ...) body...)`
+      # If the body is empty, the lambda returns nil.
       args_expr = second(expr)
       body_expr = rest(rest(expr))
       evlambda(args_expr, body_expr)
     when :define
+      # Creates a new function and adds it to the global environment.
+      # Form: `(define name value)` (For variables)
+      #    or `(define (name arg0 arg1 ...) body...)` (For functions)
+      # If the body is empty, the function returns nil.
       evdefine(rest(expr), env, false)
     when :"let*"
+      # `expr` has the following form:
+      # (let* (name value) body...)
+      # The binding (name-value pair) is evaluated and added to the
+      # environment. Then the body is executed and the result of the
+      # last expression returned.
+      # If the body is empty, returns nil.
       name = first(second(expr))
       val = eval_ly(second(second(expr)), env)
       env1 = Cons.new(Cons.new(name, val), env)
       eval_keep_last(rest(rest(expr)), env1)
     when :"let"
+      # 'expr' has the following form:
+      # (let ((sym0 val0) (sym1 val1) ...) body...)
+      # The bindings (sym-val pairs) are evaluated, added to the environment
+      # and then the body is evaluated. The last returned value is returned.
       bindings = second(expr)
       body = rest(rest(expr))
       env1 = env
@@ -390,36 +468,71 @@ def eval_ly(expr, env)
       end
       eval_keep_last(rest(rest(expr)), env1)
     when :quote
-      raise "Too many arguments for quote." unless rest(rest(expr)).nil?
+      # Quotes a single expression so that it is not evaluated when
+      # passed.
+      if rest(expr).nil? || !(rest(rest(expr)).nil?)
+        raise "quote takes exactly 1 argument"
+      end
       second(expr)
     when :"def-macro"
+      # Same as define, but the 'ismacro' parameter is true.
+      # Form: `(def-macro (name arg0 arg1 ...) body...)`
       evdefine(rest(expr), env, true)
     else
+      # Here, the expression will have a form like the following:
+      # (func arg0 arg1 ...)
+      # The function corresponding to the symbol ('func in this example)
+      # is fetched from the environment.
+      # If the function is a macro, the arguments are not evaluated before
+      # executing the macro. Otherwise, the arguments are evaluated and
+      # the function is called.
+      
       # Find value of symbol in env and call it as a function
       func = eval_ly(first(expr), env)
+      
+      # The arguments which will be passed to the function.
       args = rest(expr)
+      
+      # If `expr` had the form `((...) ...)`, then the result of the
+      # inner cons must be executed too.
       func = eval_ly(func, env) if func.is_a?(Cons)
+      
       if func.ismacro
-        #$lyra_call_stack = Cons.new(func, $lyra_call_stack)
+        # The macro is first called and the resulting expression
+        # is then executed.
         eval_ly(func.call(args, env), env)
       else
-        if (first(expr) == :times)
-          #puts (func == $lyra_call_stack.car) unless $lyra_call_stack.nil?
-        end
+        # Evaluate arguments that will be passed to the call.
         args = eval_list(args, env)
+        
+        # Check whether a tailcall is possible
+        # A tailcall is possible if the function is not natively implemented
+        # and the same function is at the front of the call stack.
+        # So `(define (crash n) (crash (inc n)))` will tail call,
+        # but `(define (crash) (inc (crash)))` will not.
+        # Notice that the special commands if, let* and let (and all macros
+        # which boil down to them, like `begin`) do not go on the callstack.
+        # So `(define (dotimes n f)
+        #       (if (= 0 n) '() (begin (f) (dotimes (dec n) f))))`
+        # will alsotail call,
         if (!func.native?) && (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
           # Tail call
           raise TailCall.new(args)
+        else
+          # Call the function with the new arguments
+          func.call(args, env)
         end
-        #$lyra_call_stack = Cons.new(func, $lyra_call_stack)
-        func.call(args, env)
       end
     end
   else
-    expr # Atoms evaluate to themselves
+    # The expr is not nil, not a cons and not a symbol.
+    # Thus, it is an atom and evaluates to itself.
+    expr
   end
 end
 
+# Treat the first console argument as a filename,
+# read from the file and evaluate the result.
 if ARGV.size > 0
   evalstr(IO.read(ARGV[0]))
 end

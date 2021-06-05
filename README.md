@@ -14,6 +14,7 @@ Lyra is a lisp I make for fun and learning.
 - Different numeric types: Integer and Float  
 - Macros  
 - Tail recursion  
+- Access to the environment for people who know what they are doing.  
 
 ## Types:
 

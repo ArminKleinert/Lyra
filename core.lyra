@@ -1,10 +1,12 @@
 
+; Load, parse and execute a lyra-source file
 (define (load! f)
   (eval! (parse (slurp! f))))
 
 (define require! load!)
 (define import! load!)
 
+; This macro ignores its body and returns nil.
 (def-macro (comment & e)
   )
 
@@ -32,23 +34,30 @@
 (define (third c) (car (cdr (cdr c))))
 (define (rest c) (cdr c))
 
+; Fold left.
 (define (foldl f start coll)
   (if (empty? coll)
     start
     (foldl f (f start (first coll) (rest coll)))))
 
+; Reduce is just an alias for foldl.
+(define reduce foldl)
+
+; Fold right
 (define (foldr f start coll)
   (if (empty? coll)
     start
     (f (first coll) (foldr f start (rest coll)))))
 
-; and
+; Boolean and
 (def-macro (and x y)
   (list 'if x y #f))
 
+; Boolean or
 (def-macro (or x y)
   (list 'if x #t y))
 
+; Negate boolean
 (define (not x)
   (if x #f #t))
 
@@ -56,7 +65,7 @@
 (define (length c)
   (if (not (cons? c))
     0
-    (inc (length (dec c)))))
+    (inc (length (rest c)))))
 
 (define (<= x y) (or (< x y) (= x y)))
 (define (>= x y) (or (> x y) (= x y)))
@@ -64,6 +73,7 @@
 (define (inc n) (+ n 1))
 (define (dec n) (- n 1))
 
+; Get the nth element from a list.
 (define (nth xs index)
   (if xs
     (if (= index 0)
@@ -71,24 +81,31 @@
       (nth (cdr xs) (- index 1)))
     '()))
 
+; Read a line from stdin.
 (define (read!)
   (sread! stdin))
 
+; Prints a string to stdout.
 (define (print! s)
   (sprint! stdout s))
 
+; Prints a string to stdout followed by a new line.
 (define (println! s)
   (sprint! stdout s)
   (sprint! stdout "\n"))
 
+; Execute 2 commands in order. The second argument is returned.
 (define (begin e0 e1)
   (if e0 e1 e1))
 
+; Executes a function f on each element of a list xs
+; and returns a new list.
 (define (map f xs)
   (if (null? xs)
     '()
     (cons (f (car xs)) (map f (cdr xs)))))
 
+; Like map, but works in place.
 (define (map! f xs)
   (if (null? xs)
     xs
@@ -96,6 +113,7 @@
       (set-car! xs (f (car xs))
       (map! f (cdr xs))))))
 
+; Filter a list xs by a predicate f.
 (define (filter f xs)
   (if (null? xs)
     '()
@@ -103,11 +121,15 @@
       (cons (car xs) (filter f (cdr xs)))
       (filter f (cdr xs)))))
 
+; Returns the last entry of a list.
 (define (last-entry cs)
-  (if (empty? (cdr cs))
+  (if (empty? cs)
     cs
-    (last-entry (cdr cs))))
+    (if (empty? (cdr cs))
+      cs
+      (last-entry (cdr cs))))
 
+; Do not call directly. This should only be called by deprioritise!.
 (define (deprioritise-helper! env sym val found)
   (if (empty? env)
     '()
@@ -150,9 +172,8 @@
 (define (index-in-env! sym)
   (index-in-env-helper! sym (global-env!) 0))
 
-(define nothing '())
 
-
+; Prints the elements of a list, separated by newlines.
 (define (printall! cs)
   (if (empty? cs)
     '()
@@ -160,6 +181,8 @@
       (println! (car cs))
       (printall! (cdr cs)))))
 
+; Execute a function with no arguments n times. If n is
+; less than 1, the function is still executed at least once.
 (define (times n f)
   (if (<= n 1)
     (f)
@@ -167,16 +190,35 @@
       (f)
       (times (dec n) f))))
 
-(println!
-  (measure 1000
-    (lambda ()
-      (deprioritise! 'nothing)
-      (index-in-env! 'nothing))))
+; Appends a list to another.
+; The complexity depends on the length of the first list.
+(define (append c0 c1)
+  (if (empty? c0)
+    c1
+    (cons (car c0) (append (cdr c0) c1))))
 
-(comment
+;;;
+; Tests from here.
+;;;
+
+; Here for testing.
+(define (range n m)
+  (if (= n m)
+    '()
+    (cons n (range (inc n) m))))
+
+(let* (longvar (range 0 1000))
+  (println!
+    (measure 10
+      (lambda ()
+        (length longvar)
+        (length longvar)
+        (length longvar)
+        (length longvar)
+        (length longvar)))))
 
 (println!
-  (measure 1000
+  (measure 10
     (lambda ()
       (last-entry (global-env!)))))
 
@@ -186,13 +228,15 @@
     (lambda ()
       (last-entry (global-env!)))))
 
+; Thanks to tail-recursion, this will not actually crash.
 (define (crash)
   (crash))
 
 (times
-  100000
+  100
   (lambda () '()))
-)
+
+
 
 
 

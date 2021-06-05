@@ -41,10 +41,11 @@ end
 
 # TODO Update description
 # [\s,]* Whitespace
+# '\(\) Matches the empty list (also called nil)
 # [()'] Matches (, ), '
 # "(?:\\.|[^\\"])*"? Matches 0 or 1 string
 # ;.* Matches comment and rest or line
-# [^\s\[\]{}('"`,;)]* Everything else
+# '?[^\s\[\]{}('"`,;)]* Everything else with an optional ' at the beginning.
 RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
 
 # Scan the text using RE, remove empty tokens and remove comments.
@@ -203,7 +204,8 @@ def setup_core_functions
   add_fn(:"p&", 2)        { |args, _| first(args) & second(args) } # bit-and
   add_fn(:"p|", 2)        { |args, _| first(args) | second(args) } # bit-or
   add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) } # bit-xor
-  # TODO: Add bit-shifts.
+  add_fn(:"p<<", 2)       { |args, _| first(args) << second(args) } # bit-shift-left
+  add_fn(:"p>>", 2)       { |args, _| first(args) >> second(args) } # bit-shift-right
 
   add_fn(:list, -1)       { |args, _| args }
   add_fn(:car, 1)         { |args, _| first(args).car }
@@ -414,9 +416,11 @@ def eval_ly(expr, env)
     # The expression is a cons and probably starts with a symbol.
     # The evaluate function will try to treat the symbol as a function
     # and execute it.
-    # If the cons is empty or does not start with a symbol, an error
-    # is thrown.
-    # TODO: Error if not starting with a symbol
+    # If the first expression in the cons is another cons, that one 
+    # will be evaluated first and then run as a function too.
+    #   Example: ((lambda (n) (+ n 1)) 15)
+    # If the cons is empty or does not start with a symbol or another
+    # cons, an error is thrown.
     
     # Try to match the symbol.
     case first(expr)
@@ -424,7 +428,7 @@ def eval_ly(expr, env)
       # Form is `(if predicate then-branch else-branch)`.
       # If the predicate holds true, the then-branch is executed.
       # Otherwise, the else-branch is executed.
-      # TODO: Check arity
+      raise "if needs 3 arguments." if list_len(expr)
       if eval_ly(second(expr), env)
         # The predicate was true
         eval_ly(third(expr), env)
@@ -433,6 +437,8 @@ def eval_ly(expr, env)
         eval_ly(fourth(expr), env)
       end
     when :lambda
+      raise "lambda must take at least 1 argument." if expr.cdr.nil?
+
       # Defines an anonymous function.
       # Form: `(lambda (arg0 arg1 ...) body...)`
       # If the body is empty, the lambda returns nil.
@@ -446,6 +452,9 @@ def eval_ly(expr, env)
       # If the body is empty, the function returns nil.
       evdefine(rest(expr), env, false)
     when :"let*"
+      raise "let* needs at least 1 argument." if expr.cdr.nil?
+      raise "let* bindings must be a list." unless bindings.is_a?(Cons)
+
       # `expr` has the following form:
       # (let* (name value) body...)
       # The binding (name-value pair) is evaluated and added to the
@@ -457,14 +466,18 @@ def eval_ly(expr, env)
       env1 = Cons.new(Cons.new(name, val), env) # Add the value to the environment.
       eval_keep_last(rest(rest(expr)), env1) # Evaluate the body.
     when :"let"
+      raise "let needs at least 1 argument." if expr.cdr.nil?
+      raise "let bindings must be a list." unless bindings.is_a?(Cons)
+
       # 'expr' has the following form:
       # (let ((sym0 val0) (sym1 val1) ...) body...)
       # The bindings (sym-val pairs) are evaluated, added to the environment
       # and then the body is evaluated. The last returned value is returned.
+
       bindings = second(expr)
       body = rest(rest(expr))
       env1 = env
-      
+
       # Evaluate and add the bindings in order (so they will end up in the
       # environment in reverse order since they are each appended to the
       # beginning).

@@ -155,6 +155,8 @@ Quoted expressions: Currently, the `'` prefix only works on the empty list and s
 "Curried" lambdas like the following: `(lambda (n) (lambda (m) (+ n m)))`  
 This will fail because `n` won't be found when the inner lambda is called. The same happens with lambdas inside a `let*`.
 
+A `cond` macro.
+
 ## Videos:
 
 https://www.youtube.com/playlist?list=PLatjRac4Qo4BQ-ksFWeYUt8FL03MnJVPK

@@ -13,7 +13,8 @@
 (define empty? null?)
 (define nil '())
 
-; Operators
+; Operators. These can later be expanded for other types.
+; Maybe we could add conses or vectors or strings together?
 (define = p=)
 (define eq? p=)
 (define eql´? p=)
@@ -27,6 +28,8 @@
 (define & p&)
 (define | p|)
 (define ^ p^)
+(define << p<<)
+(define >> p>>)
 
 ; Accessors for conses
 (define first car)
@@ -62,6 +65,10 @@
   (if x #f #t))
 
 ; Length of cons
+; Since it's not tail-recursive, I would expect
+; this to be super inefficient and cause stack 
+; overflows. But it can handle 10_000_000 elements
+; and probably more very quickly.
 (define (length c)
   (if (not (cons? c))
     0
@@ -207,7 +214,7 @@
     '()
     (cons n (range (inc n) m))))
 
-(let* (longvar (range 0 100000))
+(let* (longvar (range 0 2500000))
   (println!
     (measure 10
       (lambda ()

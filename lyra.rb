@@ -28,20 +28,14 @@ Cons = Struct.new(:car, :cdr) do
 end
 
 # Convenience functions.
-def first(c); c.car
-end
-def second(c); c.cdr.car
-end
-def third(c); c.cdr.cdr.car
-end
-def fourth(c); c.cdr.cdr.cdr.car
-end
-def rest(c); c.cdr
-end
+def first(c); c.car; end
+def second(c); c.cdr.car; end
+def third(c); c.cdr.cdr.car; end
+def fourth(c); c.cdr.cdr.cdr.car; end
+def rest(c); c.cdr; end
 
-# TODO Update description
 # [\s,]* Whitespace
-# '\(\) Matches the empty list (also called nil)
+# '\(\) Matches the empty list '() (also called nil)
 # [()'] Matches (, ), '
 # "(?:\\.|[^\\"])*"? Matches 0 or 1 string
 # ;.* Matches comment and rest or line
@@ -139,9 +133,6 @@ class LyraFn < Proc
     raise "#{@name}: Too few arguments. (Given #{args_given}, expected #{@arg_counts})" if args_given < arg_counts.first
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
-    # Add the function to the lyra-callstack.
-    #$lyra_call_stack = Cons.new(self, $lyra_call_stack)
-    
     begin
       # Execute the body.
       r = body.call(args, env)
@@ -156,15 +147,12 @@ class LyraFn < Proc
       raise
     end
     
-    # Remove from the callstack.
-    #$lyra_call_stack = $lyra_call_stack.cdr
-    
     # Return
     r
   end
   
   def to_s
-    "<#{@ismacro ? "macro" : "function"} #{name}>"
+    "<#{@ismacro ? "macro" : "function"} #{@name}>"
   end
   
   def native?
@@ -174,7 +162,7 @@ end
 
 class NativeLyraFn < LyraFn
   def native?
-    false #true
+    true
   end
 end
 
@@ -213,7 +201,7 @@ def setup_core_functions
   add_fn(:cons, 2)        { |args, _| Cons.new(first(args), second(args)) }
   add_fn(:"set-car!", 2)  { |args, _| first(args).car = second(args) }
   add_fn(:"set-cdr!", 2)  { |args, _| first(args).cdr = second(args) }
-  add_fn(:"plen", 1)      { |args, _| list_len(first(args)) }
+  #add_fn(:"plen", 1)      { |args, _| list_len(first(args)) }
 
   add_fn(:null?, 1)       { |args, _| first(args).nil? }
   add_fn(:cons?, 1)       { |args, _| first(args).is_a?(Cons)}
@@ -256,7 +244,7 @@ end
 
 # nil is not a valid pair but will be used as a separator between
 # local LYRA_ENV and global LYRA_ENV.
-unless  Object.const_defined?(:LYRA_ENV)
+unless Object.const_defined?(:LYRA_ENV)
   LYRA_ENV = Cons.new(nil,nil)
   $lyra_call_stack = nil # Also handled as a cons
   setup_core_functions()
@@ -281,6 +269,7 @@ def pairs(cons0, cons1)
   if cons0.nil?
     nil
   elsif cons1.nil?
+    # FIXME
     Cons.new(Cons.new(first(cons0), nil), pairs(cons0.cdr, nil))
   elsif cons0.cdr.nil? && !(cons1.cdr.nil?)
     Cons.new(Cons.new(first(cons0), cons1), nil)
@@ -288,8 +277,6 @@ def pairs(cons0, cons1)
     Cons.new(Cons.new(first(cons0), first(cons1)), pairs(cons0.cdr, cons1.cdr))
   end
 end
-
-# Check atoms for equality
 
 # Search environment for symbol
 def associated(x, env)
@@ -397,7 +384,7 @@ def evlambda(args_expr, body_expr, ismacro = false)
       arg_count -= 1
     end
   end
-
+  
   LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
     # Makes pairs of the argument names and given arguments and
     # adds these pairs to the local environment.
@@ -486,12 +473,12 @@ def eval_ly(expr, env)
       # environment in reverse order since they are each appended to the
       # beginning).
       while bindings
-        env1 = Cons.new(Cons.new(bindings.car.car, bindings.car.cdr.car), env1)
+        env1 = Cons.new(Cons.new(bindings.car.car, eval_ly(bindings.car.cdr.car)), env1)
         bindings = bindings.cdr
       end
       
       # Execute the body.
-      eval_keep_last(rest(rest(expr)), env1)
+      eval_keep_last(body, env1)
     when :quote
       # Quotes a single expression so that it is not evaluated when
       # passed.
@@ -527,7 +514,6 @@ def eval_ly(expr, env)
         # is then executed.
         eval_ly(func.call(args, env), env)
       else
-        
         # Check whether a tailcall is possible
         # A tailcall is possible if the function is not natively implemented
         # and the same function is at the front of the call stack.
@@ -537,16 +523,17 @@ def eval_ly(expr, env)
         # which boil down to them, like `begin`) do not go on the callstack.
         # So `(define (dotimes n f)
         #       (if (= 0 n) '() (begin (f) (dotimes (dec n) f))))`
-        # will alsotail call,
+        # will also tail call.
         if (!func.native?) && (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
-        # Evaluate arguments that will be passed to the call.
-        args = eval_list(args, env)
+          # Evaluate arguments that will be passed to the call.
+          args = eval_list(args, env)
           # Tail call
           raise TailCall.new(args)
         else
-          $lyra_call_stack = Cons.new(func, $lyra_call_stack)
-        # Evaluate arguments that will be passed to the call.
-        args = eval_list(args, env)
+          $lyra_call_stack = Cons.new(func, $lyra_call_stack)          
+          
+          # Evaluate arguments that will be passed to the call.
+          args = eval_list(args, env)
           
           #puts $lyra_call_stack
           
@@ -558,7 +545,6 @@ def eval_ly(expr, env)
           
           r
         end
-        #  func.call(args, env)
       end
     end
   else
@@ -573,3 +559,4 @@ end
 if ARGV.size > 0
   evalstr(IO.read(ARGV[0]))
 end
+

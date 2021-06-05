@@ -17,7 +17,7 @@
 ; Maybe we could add conses or vectors or strings together?
 (define = p=)
 (define eq? p=)
-(define eql´? p=)
+(define eql? p=)
 (define < p<)
 (define > p>)
 (define + p+)
@@ -203,80 +203,6 @@
 ; Tests from here.
 ;;;
 
-; Here for testing.
-(define (range n m res)
-  (if (= n m)
-    res
-    (range (inc n) m (cons n res))))
-
-;(println! (list 1 2 3 4 5))
-;(println! (plen (list 1 2 3 4 5)))
-;(println! (length3 (list 1 2 3 4 5) 0))
-;(println! (cons? (list 1 2 3 4 5)))
-;(println! (if (not (cons? (list 1 2 3 4 5))) 0 (inc 1)))
-
-(define (fib n a b)
-  (if (= n 0) a
-  (if (= n 1) b
-  (fib (dec n) b (+ a b)))))
-
-(define (fib2 n)
-  ;(println! (length (call-stack!)))
-  (if (< n 2)
-    n
-    (+ (fib2 (dec n)) (fib2 (- n 2)))))
-
-;(println! (fib 20 0 1))
-;(println! (fib2 20))
-
-(println! (time!))
-(let* (longvar (range 0 250000 '()))
-  (println! (time!))
-  (println! (length longvar))
-  (println! (measure 1 (lambda () (length longvar)))))
-
-(comment
-
-;(println! (+ "Rrsult: " (string (fib2 25))))
-;(println! (measure 1 (lambda () (fib 25 0 1))))
-;(println! (measure 1 (lambda () (fib2 25))))
-
-
-(println! (measure 1
-  (lambda ()
-    (let* (longvar (range 0 2500000))
-      (println! (measure 10 (lambda () (length longvar))))
-      (println! (measure 10 (lambda () (length2 longvar))))))))
-
-(let* (longvar (range 0 2500000))
-  (println!
-    (measure 10
-      (lambda ()
-        (length longvar)
-        (length longvar)
-        (length longvar)
-        (length longvar)
-        (length longvar)))))
-
-(println!
-  (measure 10
-    (lambda ()
-      (last-entry (global-env!)))))
-
-(println!
-  (times
-    10
-    (lambda ()
-      (last-entry (global-env!)))))
-
-; Thanks to tail-recursion, this will not actually crash.
-(define (crash)
-  (crash))
-
-(times
-  100
-  (lambda () '()))
-)
 
 
 

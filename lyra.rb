@@ -451,9 +451,9 @@ def eval_ly(expr, env)
       # last expression returned.
       # If the body is empty, returns nil.
       name = first(second(expr))
-      val = eval_ly(second(second(expr)), env)
-      env1 = Cons.new(Cons.new(name, val), env)
-      eval_keep_last(rest(rest(expr)), env1)
+      val = eval_ly(second(second(expr)), env) # Evaluate the value.
+      env1 = Cons.new(Cons.new(name, val), env) # Add the value to the environment.
+      eval_keep_last(rest(rest(expr)), env1) # Evaluate the body.
     when :"let"
       # 'expr' has the following form:
       # (let ((sym0 val0) (sym1 val1) ...) body...)
@@ -462,10 +462,16 @@ def eval_ly(expr, env)
       bindings = second(expr)
       body = rest(rest(expr))
       env1 = env
+      
+      # Evaluate and add the bindings in order (so they will end up in the
+      # environment in reverse order since they are each appended to the
+      # beginning).
       while bindings
         env1 = Cons.new(Cons.new(bindings.car.car, bindings.car.cdr.car), env1)
         bindings = bindings.cdr
       end
+      
+      # Execute the body.
       eval_keep_last(rest(rest(expr)), env1)
     when :quote
       # Quotes a single expression so that it is not evaluated when

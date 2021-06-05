@@ -15,6 +15,7 @@ Lyra is a lisp I make for fun and learning.
 - Macros  
 - Tail recursion  
 - Access to the environment for people who know what they are doing.  
+- Many TODOs :D
 
 ## Types:
 

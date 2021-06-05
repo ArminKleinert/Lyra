@@ -189,19 +189,21 @@ def setup_core_functions
     LYRA_ENV.cdr = Cons.new(Cons.new(name, value), LYRA_ENV.cdr)
   end
 
+  # "Primitive" operators. They are overridden in the core library of
+  # Lyra as `=`, `<`, `>`, ... and can be extended there later on for
+  # different types.
   add_fn(:"p=", 2)        { |args, _| first(args) == second(args) }
   add_fn(:"p<", 2)        { |args, _| first(args) < second(args) }
   add_fn(:"p>", 2)        { |args, _| first(args) > second(args) }
-
   add_fn(:"p+", 2)        { |args, _| first(args) + second(args) }
   add_fn(:"p-", 2)        { |args, _| first(args) - second(args) }
   add_fn(:"p*", 2)        { |args, _| first(args) * second(args) }
   add_fn(:"p/", 2)        { |args, _| first(args) / second(args) }
   add_fn(:"p%", 2)        { |args, _| first(args) % second(args) }
-
-  add_fn(:"p&", 2)        { |args, _| first(args) & second(args) }
-  add_fn(:"p|", 2)        { |args, _| first(args) | second(args) }
-  add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) }
+  add_fn(:"p&", 2)        { |args, _| first(args) & second(args) } # bit-and
+  add_fn(:"p|", 2)        { |args, _| first(args) | second(args) } # bit-or
+  add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) } # bit-xor
+  # TODO: Add bit-shifts.
 
   add_fn(:list, -1)       { |args, _| args }
   add_fn(:car, 1)         { |args, _| first(args).car }

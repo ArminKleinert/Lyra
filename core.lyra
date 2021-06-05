@@ -41,7 +41,7 @@
 (define (foldl f start coll)
   (if (empty? coll)
     start
-    (foldl f (f start (first coll) (rest coll)))))
+    (foldl f (f start (first coll)) (rest coll))))
 
 ; Reduce is just an alias for foldl.
 (define reduce foldl)
@@ -64,21 +64,16 @@
 (define (not x)
   (if x #f #t))
 
-; Length of cons
-; Since it's not tail-recursive, I would expect
-; this to be super inefficient and cause stack 
-; overflows. But it can handle 10_000_000 elements
-; and probably more very quickly.
-(define (length c)
-  (if (not (cons? c))
-    0
-    (inc (length (rest c)))))
-
 (define (<= x y) (or (< x y) (= x y)))
 (define (>= x y) (or (> x y) (= x y)))
 
 (define (inc n) (+ n 1))
 (define (dec n) (- n 1))
+
+; Length of cons
+(define (length c)
+  (let* (addone (lambda (n m) (inc n)))
+    (foldl addone 0 c)))
 
 ; Get the nth element from a list.
 (define (nth xs index)
@@ -209,10 +204,49 @@
 ;;;
 
 ; Here for testing.
-(define (range n m)
+(define (range n m res)
   (if (= n m)
-    '()
-    (cons n (range (inc n) m))))
+    res
+    (range (inc n) m (cons n res))))
+
+;(println! (list 1 2 3 4 5))
+;(println! (plen (list 1 2 3 4 5)))
+;(println! (length3 (list 1 2 3 4 5) 0))
+;(println! (cons? (list 1 2 3 4 5)))
+;(println! (if (not (cons? (list 1 2 3 4 5))) 0 (inc 1)))
+
+(define (fib n a b)
+  (if (= n 0) a
+  (if (= n 1) b
+  (fib (dec n) b (+ a b)))))
+
+(define (fib2 n)
+  ;(println! (length (call-stack!)))
+  (if (< n 2)
+    n
+    (+ (fib2 (dec n)) (fib2 (- n 2)))))
+
+;(println! (fib 20 0 1))
+;(println! (fib2 20))
+
+(println! (time!))
+(let* (longvar (range 0 250000 '()))
+  (println! (time!))
+  (println! (length longvar))
+  (println! (measure 1 (lambda () (length longvar)))))
+
+(comment
+
+;(println! (+ "Rrsult: " (string (fib2 25))))
+;(println! (measure 1 (lambda () (fib 25 0 1))))
+;(println! (measure 1 (lambda () (fib2 25))))
+
+
+(println! (measure 1
+  (lambda ()
+    (let* (longvar (range 0 2500000))
+      (println! (measure 10 (lambda () (length longvar))))
+      (println! (measure 10 (lambda () (length2 longvar))))))))
 
 (let* (longvar (range 0 2500000))
   (println!
@@ -242,6 +276,7 @@
 (times
   100
   (lambda () '()))
+)
 
 
 

@@ -140,7 +140,7 @@ class LyraFn < Proc
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
     # Add the function to the lyra-callstack.
-    $lyra_call_stack = Cons.new(self, $lyra_call_stack)
+    #$lyra_call_stack = Cons.new(self, $lyra_call_stack)
     
     begin
       # Execute the body.
@@ -157,7 +157,7 @@ class LyraFn < Proc
     end
     
     # Remove from the callstack.
-    $lyra_call_stack = $lyra_call_stack.cdr
+    #$lyra_call_stack = $lyra_call_stack.cdr
     
     # Return
     r
@@ -174,7 +174,7 @@ end
 
 class NativeLyraFn < LyraFn
   def native?
-    true
+    false #true
   end
 end
 
@@ -213,6 +213,7 @@ def setup_core_functions
   add_fn(:cons, 2)        { |args, _| Cons.new(first(args), second(args)) }
   add_fn(:"set-car!", 2)  { |args, _| first(args).car = second(args) }
   add_fn(:"set-cdr!", 2)  { |args, _| first(args).cdr = second(args) }
+  add_fn(:"plen", 1)      { |args, _| list_len(first(args)) }
 
   add_fn(:null?, 1)       { |args, _| first(args).nil? }
   add_fn(:cons?, 1)       { |args, _| first(args).is_a?(Cons)}
@@ -237,6 +238,7 @@ def setup_core_functions
   add_fn(:env!, 0)        { |_, env| env }
   add_fn(:"global-env!", 0) { |_, _| LYRA_ENV.cdr }
   add_fn(:time!, 0)       { |_, _| Time.now.to_f }
+  add_fn(:"call-stack!", 0) { |_, _| $lyra_call_stack }
   
   add_fn(:measure, 2)     { |args, env|
                             t = Time.now
@@ -428,8 +430,10 @@ def eval_ly(expr, env)
       # Form is `(if predicate then-branch else-branch)`.
       # If the predicate holds true, the then-branch is executed.
       # Otherwise, the else-branch is executed.
-      raise "if needs 3 arguments." if list_len(expr)
-      if eval_ly(second(expr), env)
+      raise "if needs 3 arguments." if list_len(expr) < 4 # includes the 'if
+      pres = eval_ly(second(expr), env)
+      #uts "In if: " + pres.to_s
+      if pres != false && pres != nil
         # The predicate was true
         eval_ly(third(expr), env)
       else
@@ -453,7 +457,7 @@ def eval_ly(expr, env)
       evdefine(rest(expr), env, false)
     when :"let*"
       raise "let* needs at least 1 argument." if expr.cdr.nil?
-      raise "let* bindings must be a list." unless bindings.is_a?(Cons)
+      raise "let* bindings must be a list." unless second(expr).is_a?(Cons)
 
       # `expr` has the following form:
       # (let* (name value) body...)
@@ -467,7 +471,7 @@ def eval_ly(expr, env)
       eval_keep_last(rest(rest(expr)), env1) # Evaluate the body.
     when :"let"
       raise "let needs at least 1 argument." if expr.cdr.nil?
-      raise "let bindings must be a list." unless bindings.is_a?(Cons)
+      raise "let bindings must be a list." unless second(expr).is_a?(Cons)
 
       # 'expr' has the following form:
       # (let ((sym0 val0) (sym1 val1) ...) body...)
@@ -523,8 +527,6 @@ def eval_ly(expr, env)
         # is then executed.
         eval_ly(func.call(args, env), env)
       else
-        # Evaluate arguments that will be passed to the call.
-        args = eval_list(args, env)
         
         # Check whether a tailcall is possible
         # A tailcall is possible if the function is not natively implemented
@@ -537,12 +539,26 @@ def eval_ly(expr, env)
         #       (if (= 0 n) '() (begin (f) (dotimes (dec n) f))))`
         # will alsotail call,
         if (!func.native?) && (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
+        # Evaluate arguments that will be passed to the call.
+        args = eval_list(args, env)
           # Tail call
           raise TailCall.new(args)
         else
+          $lyra_call_stack = Cons.new(func, $lyra_call_stack)
+        # Evaluate arguments that will be passed to the call.
+        args = eval_list(args, env)
+          
+          #puts $lyra_call_stack
+          
           # Call the function with the new arguments
-          func.call(args, env)
+          r = func.call(args, env)
+    
+          # Remove from the callstack.
+          $lyra_call_stack = $lyra_call_stack.cdr
+          
+          r
         end
+        #  func.call(args, env)
       end
     end
   else

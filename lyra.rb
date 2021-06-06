@@ -36,7 +36,7 @@ def rest(c); c.cdr; end
 
 # [\s,]* Whitespace
 # '\(\) Matches the empty list '() (also called nil)
-# [()'] Matches (, ), '
+# [()] Matches (, )
 # "(?:\\.|[^\\"])*"? Matches 0 or 1 string
 # ;.* Matches comment and rest or line
 # '?[^\s\[\]{}('"`,;)]* Everything else with an optional ' at the beginning.
@@ -80,26 +80,27 @@ def make_ast(tokens, level=0)
     when "'()"                  then root << nil
     when "#t"                   then root << true
     when "#f"                   then root << false
-    when /^-?0b[0-1]+|-?0x[0-9a-fA-F]+|-?[0-9]+$/
+    when /^(0b[0-1]+|-?0x[0-9a-fA-F]+|-?[0-9]+)$/
       mult = 1
       if t[0] == "-"
         mult = -1
         t = t[1..-1]
       end
-      base = case t[0..1]
+      
+      case t[0..1]
       when "0x"
         t = t[2..-1]
-        16
+        base = 16
       when "0b"
         t = t[2..-1]
-        2
+        base = 2
       else
-        10
+        base = 10
       end
 
       n = t.to_i(base) * mult
       root << n
-    when /^-?[0-9]+\.[0-9]+|-?[0-9]+$/
+    when /^-?[0-9]+\.[0-9]+$/
       root << t.to_f
     when /^"(?:\\.|[^\\"])*"$/  then root << parse_str(t)
     else
@@ -225,7 +226,8 @@ add_fn(:vector, -1)          { |args, _| args.to_a }
 add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }
 add_fn(:"vector-set!", 3)    { |args, _| first(args)[second(args)] = third(args)
                                 first(args) }
-add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args); first(args) }
+add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
+                                first(args) }
 add_fn(:"vector-size", 1)    { |args, _| first(args).size }
 
 add_fn(:null?, 1)            { |args, _| first(args).nil? }
@@ -498,7 +500,7 @@ def eval_ly(expr, env)
       val = eval_ly(second(second(expr)), env) # Evaluate the value.
       env1 = Cons.new(Cons.new(name, val), env) # Add the value to the environment.
       eval_keep_last(rest(rest(expr)), env1) # Evaluate the body.
-    when :"let"
+    when :let
       raise "let needs at least 1 argument." if expr.cdr.nil?
       raise "let bindings must be a list." unless second(expr).is_a?(Cons)
 

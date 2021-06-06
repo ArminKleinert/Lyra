@@ -37,9 +37,9 @@
 ; Operators. These can later be expanded for other types.
 ; Maybe we could add conses or vectors or strings together?
 (define = p=)
-(define (not= e0 e1) (not (= e0 e1)))
 (define eq? p=)
 (define eql? p=)
+(define (not= e0 e1) (not (eq? e0 e1)))
 (define < p<)
 (define > p>)
 (define + p+)
@@ -189,13 +189,13 @@
   (if e0 e1 e1))
 
 (define (map-vector f v)
-  (let* (iter-fn (lambda (i nv)
-                    (if (= (vector-size v) i)
-                      nv
-                      (begin
-                        (vector-append! nv (f (vector-get v i)))
-                        (iter-fn (inc i) nv)))))
-  (iter-fn 0 (vector))))
+  (let* (iter-fn
+          (lambda (i nv)
+            (if (= (vector-size v) i)
+              nv
+              (iter-fn (inc i)
+                (vector-append! nv (f (vector-get v i)))))))
+    (iter-fn 0 (vector))))
   
 (define (map-list f xs)
   (if (empty? xs)
@@ -221,7 +221,7 @@
 
 (define (filter-vector f v)
   (let* (iter (lambda (i nv)
-          (if (= i (vector-size v))
+          (if (>= i (vector-size v))
             nv
             (if (f (vector-get v i))
               (iter (inc i) (vector-append! nv (vector-get v i)))
@@ -374,11 +374,16 @@
 
 (comment
 
-(cond
-  (#f (println! "Nope"))
-  (#f (println! "Still not"))
-  (#t (println! "Yep"))
-  (#t (println! "Never")))
+(let* (v (vector 1 2 3 4 5))
+  (println! (vector? v))
+  (println! (map-vector inc v))
+  (println! (filter-vector odd? v))
+  (println! (append (vector 1 2 3) (vector 3 4 5)))
+  (println! (rest v))
+  (println! (foldl + 0 v))
+  (println! (even? (vector-get v 1)))
+  (println! (even? (vector-get v 4)))
+  )
 
 (println! (hash-code 8))
 (println! (hash-code "abc"))
@@ -390,19 +395,19 @@
 (println! (hash-code (list 1 2 3)))
 (println! (hash-code (list 1 2 (cons 3 4))))
 
-(let* (v (vector 1 2 3 4 5))
-  (vector-each id v)
-  (vector-reverse-each id v)
-  (println! (map-vector inc v))
-  (println! (filter-vector odd? v))
-  (println! (list->vector (list 1 3 5 7 9)))
-  (println! (vector->list v))
-  (println! (empty? v))
-  (println! (empty? (vector)))
-  (println! (vector-append-multi (vector 1 2 3) (vector 3 4 5)))
-  (println! (rest v))
-  (println! (foldl + 0 v))
-  (println! (even? (vector-get v 1)))
-  (println! (even? (vector-get v 4))))
+(define (add e0 e1) (+ e0 e1))
+(println! (add 1 1))
+(println! (= 1 1))
+(println! (not (= 1 1)))
+(println! (not= 1 1))
+(println! "")
+(println! (= 2 1))
+(println! (not (= 2 1)))
+(println! (not= 2 1))
+(println! "")
+(println! (= 1 2))
+(println! (not (= 1 2)))
+(println! (not= 1 2))
+
 )
 

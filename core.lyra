@@ -53,11 +53,45 @@
 (define << p<<)
 (define >> p>>)
 
+(define (max n0 n1) (if (> n0 n1) n0 n1))
+(define (min n0 n1) (if (> n0 n1) n1 n0))
+
 ; Accessors for conses
 (define (first c) (if (vector? c) (vector-get v 0) (car c)))
 (define (second c) (if (vector? c) (vector-get v 1) (car (cdr c))))
 (define (third c) (if (vector? c) (vector-get v 2) (car (cdr (cdr c)))))
+(define (fourth c) (if (vector? c) (vector-get v 3) (car (cdr (cdr (cdr c))))))
 (define (rest c) (if (vector? c) (cpy-vector v 1 (dec (vector-size v))) (cdr c)))
+
+; car and cdr variants. Prefer first, second, ... if possible
+(define (caar x)    (car (car x)))
+(define (cadr x)    (car (cdr x)))
+(define (cdar x)    (cdr (car x)))
+(define (cddr x)    (cdr (cdr x)))
+(define (caaar x)   (car (car (car x))))
+(define (caadr x)   (car (car (cdr x))))
+(define (cadar x)   (car (cdr (car x))))
+(define (caddr x)   (car (cdr (cdr x))))
+(define (cdaar x)   (cdr (car (car x))))
+(define (cdadr x)   (cdr (car (cdr x))))
+(define (cddar x)   (cdr (cdr (car x))))
+(define (cdddr x)   (cdr (cdr (cdr x))))
+(define (caaaar x)  (car (car (car (car x)))))
+(define (caaadr x)  (car (car (car (cdr x)))))
+(define (caadar x)  (car (car (cdr (car x)))))
+(define (caaddr x)  (car (car (cdr (cdr x)))))
+(define (cadaar x)  (car (cdr (car (car x)))))
+(define (cadadr x)  (car (cdr (car (cdr x)))))
+(define (caddar x)  (car (cdr (cdr (car x)))))
+(define (cadddr x)  (car (cdr (cdr (cdr x)))))
+(define (cdaaar x)  (cdr (car (car (car x)))))
+(define (cdaadr x)  (cdr (car (car (cdr x)))))
+(define (cdadar x)  (cdr (car (cdr (car x)))))
+(define (cdaddr x)  (cdr (car (cdr (cdr x)))))
+(define (cddaar x)  (cdr (cdr (car (car x)))))
+(define (cddadr x)  (cdr (cdr (car (cdr x)))))
+(define (cdddar x)  (cdr (cdr (cdr (car x)))))
+(define (cddddr x)  (cdr (cdr (cdr (cdr x)))))
 
 (define (number? e)
   (or (int? e) (float? e)))
@@ -103,7 +137,7 @@
     (cfoldl f (f start (first coll)) (rest coll))))
 
 (define (foldl f start coll)
-  (if (vector? coll) (vfoldl f start v) (cfoldl f start coll)))
+  (if (vector? coll) (vfoldl f start coll) (cfoldl f start coll)))
 
 ; Reduce is just an alias for foldl.
 (define reduce foldl)
@@ -320,11 +354,42 @@
 (define (id e)
   e)
 
+; Bad, bad, bad
+(define (hash-code e)
+  (if (string? e)
+    (hash e)
+  (if (number? e)
+    e
+  (if (or (cons? e) (vector? e))
+    (foldl
+      (lambda (res n) (* res (hash-code n)))
+      32 e)
+  (if (bool? e)
+    (if e 111 -111)
+    0)))))
+
 ;;;
 ; Tests from here.
 ;;;
 
 (comment
+
+(cond
+  (#f (println! "Nope"))
+  (#f (println! "Still not"))
+  (#t (println! "Yep"))
+  (#t (println! "Never")))
+
+(println! (hash-code 8))
+(println! (hash-code "abc"))
+(println! (hash-code '()))
+(println! (hash-code #t))
+(println! (hash-code #f))
+(println! (hash-code (vector 1 2 3)))
+(println! (hash-code (vector 1 2 (cons 3 4))))
+(println! (hash-code (list 1 2 3)))
+(println! (hash-code (list 1 2 (cons 3 4))))
+
 (let* (v (vector 1 2 3 4 5))
   (vector-each id v)
   (vector-reverse-each id v)

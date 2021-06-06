@@ -200,68 +200,73 @@ def setup_core_functions
   # "Primitive" operators. They are overridden in the core library of
   # Lyra as `=`, `<`, `>`, ... and can be extended there later on for
   # different types.
-  add_fn(:"p=", 2)        { |args, _| first(args) == second(args) }
-  add_fn(:"p<", 2)        { |args, _| first(args) < second(args) }
-  add_fn(:"p>", 2)        { |args, _| first(args) > second(args) }
-  add_fn(:"p+", 2)        { |args, _| first(args) + second(args) }
-  add_fn(:"p-", 2)        { |args, _| first(args) - second(args) }
-  add_fn(:"p*", 2)        { |args, _| first(args) * second(args) }
-  add_fn(:"p/", 2)        { |args, _| first(args) / second(args) }
-  add_fn(:"p%", 2)        { |args, _| first(args) % second(args) }
-  add_fn(:"p&", 2)        { |args, _| first(args) & second(args) } # bit-and
-  add_fn(:"p|", 2)        { |args, _| first(args) | second(args) } # bit-or
-  add_fn(:"p^", 2)        { |args, _| first(args) ^ second(args) } # bit-xor
-  add_fn(:"p<<", 2)       { |args, _| first(args) << second(args) } # bit-shift-left
-  add_fn(:"p>>", 2)       { |args, _| first(args) >> second(args) } # bit-shift-right
+add_fn(:"p=", 2)             { |args, _| first(args) == second(args) }
+add_fn(:"p<", 2)             { |args, _| first(args) < second(args) }
+add_fn(:"p>", 2)             { |args, _| first(args) > second(args) }
+add_fn(:"p+", 2)             { |args, _| first(args) + second(args) }
+add_fn(:"p-", 2)             { |args, _| first(args) - second(args) }
+add_fn(:"p*", 2)             { |args, _| first(args) * second(args) }
+add_fn(:"p/", 2)             { |args, _| first(args) / second(args) }
+add_fn(:"p%", 2)             { |args, _| first(args) % second(args) }
+add_fn(:"p&", 2)             { |args, _| first(args) & second(args) } # bit-and
+add_fn(:"p|", 2)             { |args, _| first(args) | second(args) } # bit-or
+add_fn(:"p^", 2)             { |args, _| first(args) ^ second(args) } # bit-xor
+add_fn(:"p<<", 2)            { |args, _| first(args) << second(args) } # bit-shift-left
+add_fn(:"p>>", 2)            { |args, _| first(args) >> second(args) } # bit-shift-right
 
-  add_fn(:list, -1)       { |args, _| args }
-  add_fn(:car, 1)         { |args, _| first(args).car }
-  add_fn(:cdr, 1)         { |args, _| first(args).cdr }
-  add_fn(:cons, 2)        { |args, _| Cons.new(first(args), second(args)) }
-  add_fn(:"set-car!", 2)  { |args, _| first(args).car = second(args) }
-  add_fn(:"set-cdr!", 2)  { |args, _| first(args).cdr = second(args) }
-  
-  add_fn(:vector, -1)     { |args, _| args.to_a }
-  add_fn(:"vector-get", 2){ |args, _| first(args)[second(args)] }
-  add_fn(:"vector-set!", 3){|args, _| first(args)[second(args)] = third(args); first(args) }
-  add_fn(:"vector-append!", 2){ |args, _| first(args) << second(args); first(args) }
-  add_fn(:"vector-size", 1){|args, _| first(args).size }
+add_fn(:list, -1)            { |args, _| args }
+add_fn(:car, 1)              { |args, _| first(args).car }
+add_fn(:cdr, 1)              { |args, _| first(args).cdr }
+add_fn(:cons, 2)             { |args, _| Cons.new(first(args), second(args)) }
+add_fn(:"set-car!", 2)       { |args, _| first(args).car = second(args) }
+add_fn(:"set-cdr!", 2)       { |args, _| first(args).cdr = second(args) }
 
-  add_fn(:null?, 1)       { |args, _| first(args).nil? }
-  add_fn(:cons?, 1)       { |args, _| first(args).is_a?(Cons)}
-  add_fn(:int?, 1)        { |args, _| first(args).is_a?(Integer)}
-  add_fn(:float?, 1)      { |args, _| first(args).is_a?(Float)}
-  add_fn(:string?, 1)     { |args, _| first(args).is_a?(String)}
-  add_fn(:vector?, 1)     { |args, _| first(args).is_a?(Array)}
+add_fn(:vector, -1)          { |args, _| args.to_a }
+add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }
+add_fn(:"vector-set!", 3)    { |args, _| first(args)[second(args)] = third(args)
+                                first(args) }
+add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args); first(args) }
+add_fn(:"vector-size", 1)    { |args, _| first(args).size }
 
-  add_fn(:int, 1)         { |args, _| first(args).to_i }
-  add_fn(:float, 1)       { |args, _| first(args).to_f }
-  add_fn(:string, 1)      { |args, _| first(args).to_s }
-  add_fn(:bool, 1)        { |args, _| !!first(args) }
+add_fn(:null?, 1)            { |args, _| first(args).nil? }
+add_fn(:cons?, 1)            { |args, _| first(args).is_a?(Cons)}
+add_fn(:int?, 1)             { |args, _| first(args).is_a?(Integer)}
+add_fn(:float?, 1)           { |args, _| first(args).is_a?(Float)}
+add_fn(:bool?, 1)            { |args, _| first(args) == true || first(args) == false}
+add_fn(:string?, 1)          { |args, _| first(args).is_a?(String)}
+add_fn(:vector?, 1)          { |args, _| first(args).is_a?(Array)}
 
-  add_fn(:sprint!, 2)     { |args, _| first(args).print(second(args))}
-  add_fn(:sread!, 1)      { |args, _| first(args).gets }
-  add_fn(:slurp!, 1)      { |args, _| IO.read(first(args)) }
-  add_fn(:spit!, 2)       { |args, _| IO.write(first(args), second(args)) }
-  
-  add_fn(:eval!, 1)       { |args, env| eval_keep_last(first(args), env) }
-  add_fn(:"call-with-env!", 2){ |args, _| args.car.call(args.cdr.car) }
-  add_fn(:parse, 1)       { |args, env| s = first(args)
-                                        make_ast(tokenize(s)) }
-  add_fn(:env!, 0)        { |_, env| env }
-  add_fn(:"global-env!", 0) { |_, _| LYRA_ENV.cdr }
-  add_fn(:time!, 0)       { |_, _| Time.now.to_f }
-  add_fn(:"call-stack!", 0) { |_, _| $lyra_call_stack }
-  
-  add_fn(:measure, 2)     { |args, env|
-                            t = Time.now
-                            first(args).times do |_|
-                              second(args).call(nil, env)
-                            end
-                            Time.now - t }
+add_fn(:int, 1)              { |args, _| first(args).to_i }
+add_fn(:float, 1)            { |args, _| first(args).to_f }
+add_fn(:string, 1)           { |args, _| first(args).to_s }
+add_fn(:bool, 1)             { |args, _| !!first(args) }
 
-  add_var(:stdin, $stdin)
-  add_var(:stdout, $stdout)
+add_fn(:sprint!, 2)          { |args, _| first(args).print(second(args))}
+add_fn(:sread!, 1)           { |args, _| first(args).gets }
+add_fn(:slurp!, 1)           { |args, _| IO.read(first(args)) }
+add_fn(:spit!, 2)            { |args, _| IO.write(first(args), second(args)) }
+
+add_fn(:eval!, 1)            { |args, env| eval_keep_last(first(args), env) }
+add_fn(:"call-with-env!", 2) { |args, _| args.car.call(args.cdr.car) }
+add_fn(:parse, 1)            { |args, env| s = first(args)
+                                make_ast(tokenize(s)) }
+
+add_fn(:env!, 0)             { |_, env| env }
+add_fn(:"global-env!", 0)    { |_, _| LYRA_ENV.cdr }
+add_fn(:time!, 0)            { |_, _| Time.now.to_f }
+add_fn(:"call-stack!", 0)    { |_, _| $lyra_call_stack }
+
+add_fn(:measure, 2)          { |args, env|
+                                t = Time.now
+                                first(args).times do |_|
+                                  second(args).call(nil, env)
+                                end
+                                Time.now - t }
+
+add_fn(:"hash", 1)           { |args, _| first(args).hash }
+
+add_var(:stdin, $stdin)
+add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
 
   true
@@ -452,6 +457,18 @@ def eval_ly(expr, env)
         # The predicate was not true
         eval_ly(fourth(expr), env)
       end
+    when :cond
+      clauses = rest(expr)
+      result = nil
+      until clauses.nil?
+        predicate = eval_ly(first(first(clauses)), env)
+        if predicate
+          result = eval_ly(second(first(clauses)), env)
+          break
+        end
+        clauses = rest(clauses)
+      end
+      result
     when :lambda
       raise "lambda must take at least 1 argument." if expr.cdr.nil?
 

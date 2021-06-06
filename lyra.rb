@@ -80,8 +80,27 @@ def make_ast(tokens, level=0)
     when "'()"                  then root << nil
     when "#t"                   then root << true
     when "#f"                   then root << false
-    when /^-?[0-9]+$/           then root << t.to_i
-    when /^-?[0-9][0-9.]*$/     then root << t.to_f
+    when /^-?0b[0-1]+|-?0x[0-9a-fA-F]+|-?[0-9]+$/
+      mult = 1
+      if t[0] == "-"
+        mult = -1
+        t = t[1..-1]
+      end
+      base = case t[0..1]
+      when "0x"
+        t = t[2..-1]
+        16
+      when "0b"
+        t = t[2..-1]
+        2
+      else
+        10
+      end
+
+      n = t.to_i(base) * mult
+      root << n
+    when /^-?[0-9]+\.[0-9]+|-?[0-9]+$/
+      root << t.to_f
     when /^"(?:\\.|[^\\"])*"$/  then root << parse_str(t)
     else
       if t.start_with?("'")
@@ -204,7 +223,7 @@ def setup_core_functions
   
   add_fn(:vector, -1)     { |args, _| args.to_a }
   add_fn(:"vector-get", 2){ |args, _| first(args)[second(args)] }
-  add_fn(:"vector-set!", 3){|args, _| first(args)[second(args)] = third(args) }
+  add_fn(:"vector-set!", 3){|args, _| first(args)[second(args)] = third(args); first(args) }
   add_fn(:"vector-append!", 2){ |args, _| first(args) << second(args); first(args) }
   add_fn(:"vector-size", 1){|args, _| first(args).size }
 
@@ -562,6 +581,7 @@ end
 
 # Treat the first console argument as a filename,
 # read from the file and evaluate the result.
+evalstr(IO.read("core.lyra"))
 if ARGV.size > 0
   evalstr(IO.read(ARGV[0]))
 end

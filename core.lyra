@@ -22,21 +22,22 @@
 (def-macro (comment & e)
   )
 
-(define (empty? l)
-  (if (vector? l)
-    (= (vector-size l) 0)
-    (null? l)))
-
-(define nil '())
-
 (define (atom? e)
   (if (null? e) #f
   (if (vector? e) #f
   (if (cons? e) #f #t))))
 
+(define (empty? l)
+  (if (vector? l)
+    (= (vector-size l) 0)
+    (or (atom? l) (null? l))))
+
+(define nil '())
+
 ; Operators. These can later be expanded for other types.
 ; Maybe we could add conses or vectors or strings together?
-(define (= e0 e1))
+(define = p=)
+(define (not= e0 e1) (not (= e0 e1)))
 (define eq? p=)
 (define eql? p=)
 (define < p<)
@@ -58,12 +59,35 @@
 (define (third c) (if (vector? c) (vector-get v 2) (car (cdr (cdr c)))))
 (define (rest c) (if (vector? c) (cpy-vector v 1 (dec (vector-size v))) (cdr c)))
 
+(define (number? e)
+  (or (int? e) (float? e)))
+
 (define (cpy-vector v start end)
   (let* (iter (lambda (i nv)
           (if (> i end)
             nv
             (iter (inc i) (vector-append! nv (vector-get v i))))))
     (iter start (vector))))
+
+(define (vector-each f v)
+  (let* (iter (lambda (i)
+          (if (= i (vector-size v))
+            v
+            (begin
+              (f (vector-get v i))
+              (iter (inc i))))))
+    (iter 0)
+    v))
+
+(define (vector-reverse-each f v)
+  (let* (iter (lambda (i)
+          (if (< i 0)
+            v
+            (begin
+              (f (vector-get v i))
+              (iter (dec i))))))
+    (iter (dec (vector-size v)))
+    v))
 
 ; Fold left.
 (define (vfoldl f start v)
@@ -76,7 +100,7 @@
 (define (cfoldl f start coll)
   (if (empty? coll)
     start
-    (foldl f (f start (first coll)) (rest coll))))
+    (cfoldl f (f start (first coll)) (rest coll))))
 
 (define (foldl f start coll)
   (if (vector? coll) (vfoldl f start v) (cfoldl f start coll)))
@@ -140,7 +164,7 @@
   (iter-fn 0 (vector))))
   
 (define (map-list f xs)
-  (if (null? xs)
+  (if (empty? xs)
     '()
     (cons (f (car xs)) (map f (cdr xs)))))
 
@@ -153,11 +177,11 @@
 
 ; Like map, but works in place.
 (define (map! f xs)
-  (if (null? xs)
+  (if (empty? xs)
     xs
     (begin
-      (set-car! xs (f (car xs))
-      (map! f (cdr xs))))))
+      (set-car! xs (f (first xs))
+      (map! f (rest xs))))))
 
 ; Filter a list xs by a predicate f.
 
@@ -166,23 +190,22 @@
           (if (= i (vector-size v))
             nv
             (if (f (vector-get v i))
-              (begin
-                (vector-append! nv (vector-get v i))
-                (iter (inc i) nv))
+              (iter (inc i) (vector-append! nv (vector-get v i)))
               (iter (inc i) nv)))))
     (iter 0 (vector))))
 
 (define (filter-list f xs)
-  (if (null? xs)
+  (if (empty? xs)
     '()
     (if (f (car xs))
       (cons (car xs) (filter f (cdr xs)))
-      (filter f (cdr xs)))))
+      (filter-list f (cdr xs)))))
 
 (define (filter f xs)
   (if (vector? xs) (filter-vector f xs) (filter-list f xs)))
 
 ; Returns the last entry of a list.
+
 (define (last-entry cs)
   (if (empty? cs)
     cs
@@ -233,7 +256,6 @@
 (define (index-in-env! sym)
   (index-in-env-helper! sym (global-env!) 0))
 
-
 ; Prints the elements of a list, separated by newlines.
 (define (printall! cs)
   (if (empty? cs)
@@ -256,8 +278,9 @@
 (define (append-list c0 c1)
   (if (empty? c0)
     c1
-    (cons (first c0) (append (rest c0) c1))))
+    (cons (first c0) (append-list (rest c0) c1))))
 
+; Appends a vector to another.
 (define (vector-append-multi v0 v1)
   (let* (iter (lambda (i nv)
           (if (= i (vector-size v1))
@@ -269,35 +292,52 @@
   (if (vector? c0)
     (vector-append-multi c0 c1)
     (append-list c0 c1)))
+    
+(define (reverse-list xs)
+  (foldl cons '() xs))
+
+(define (reverse-vector v)
+  (let*))
 
 (define (even? n)
   (= (% n 2) 0))
 
+(define (odd? n)
+  (not= (% n 2) 0))
+
 (define (list->vector ls)
-  (foldl (lambda (v x) (vector-append! v x)) (vector) ls))
+  (foldl (lambda (v x) (vector-append! v x))
+         (vector) ls))
+
+(define (vector->list v)
+  (let* (iter (lambda (i nl)
+          (if (< i 0)
+            nl
+            (iter (dec i)
+              (cons (vector-get v i) nl)))))
+    (iter (dec (vector-size v)) '())))
+
+(define (id e)
+  e)
 
 ;;;
 ; Tests from here.
 ;;;
 
+(comment
 (let* (v (vector 1 2 3 4 5))
-  ;(println! (map-vector inc v))
-  ;(println! (filter-vector even? (map-vector inc v)))
+  (vector-each id v)
+  (vector-reverse-each id v)
+  (println! (map-vector inc v))
+  (println! (filter-vector odd? v))
   (println! (list->vector (list 1 3 5 7 9)))
+  (println! (vector->list v))
   (println! (empty? v))
   (println! (empty? (vector)))
   (println! (vector-append-multi (vector 1 2 3) (vector 3 4 5)))
   (println! (rest v))
-  (println! (foldl + 0 v)))
-
-(comment
-(let* (v (vector 1 2 3 4 5))
-  (println! (even? 0))
-  (println! (even? 16))
-  (println! (even? 3))
+  (println! (foldl + 0 v))
   (println! (even? (vector-get v 1)))
-  (println! (even? (vector-get v 4)))
-  
-  (println! (filter-vector even? v)))
+  (println! (even? (vector-get v 4))))
 )
 

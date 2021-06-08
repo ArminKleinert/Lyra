@@ -16,7 +16,7 @@
       (lambda (s e) (if (empty? e) s (+ (+ s (string e)) " ")))
       "{ " m)
     "}"))
-    
+
 (define (bucket-index key) (% (hash-code key) MAP-NUM-BUCKETS))
 
 (define (select-bucket m key)
@@ -92,37 +92,3 @@
     (remove-from-map! m0 'a)
     (println! (get-value m0 'a)))
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

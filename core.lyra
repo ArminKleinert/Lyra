@@ -66,6 +66,8 @@
 (define (max n0 n1) (if (> n0 n1) n0 n1))
 (define (min n0 n1) (if (> n0 n1) n1 n0))
 
+(define (abs n) (if (< n 0) (- 0 n) n))
+
 (define (even? n)
   (= (% n 2) 0))
 
@@ -396,15 +398,15 @@
 ; Calculate the hash-code of an object.
 (define (hash-code e)
   (let* (code (hash-code-helper e))
-    code))
+    (bit-xor code (>> code 10))))
 
 ;;;;;
 ;;;;; SECTION : Tests
 ;;;;;
 
-(println! (reverse (list 1 2 3 4 5)))
-
 (comment
+
+(println! (reverse (list 1 2 3 4 5)))
 
 (let* (v (vector))
   (vector-set! v 1000 '())

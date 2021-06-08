@@ -25,6 +25,7 @@ Lyra is a lisp I make for fun and learning.
 - Cons (car, cdr)  
 - Boolean (#t, #f)  
 - Function  
+- Vector   
 
 ## Basic commands:
 
@@ -37,7 +38,8 @@ Lyra is a lisp I make for fun and learning.
 Example:
 ```(cond ((vector? e) (foo e)) 
 ((list? e) (bar e)) 
-#t (baz e))```  
+#t (baz e))
+```  
 
 ```
 Notice! Any function marked with '!' should only be used if you know what

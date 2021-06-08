@@ -1,6 +1,12 @@
 
 # Definition of conses
 Cons = Struct.new(:car, :cdr) do
+  def lyra_type_id; @lyra_type_id
+  end
+  def lyra_type_id=(f)
+    @lyra_type_id = f
+  end
+  
   def list_to_s_helper()
     if cdr.nil?
       car.to_s
@@ -24,6 +30,15 @@ Cons = Struct.new(:car, :cdr) do
       rest = rest.cdr
     end
     result
+  end
+end
+
+class Array
+  def lyra_type_id
+    @lyra_type_id
+  end
+  def lyra_type_id=(liti)
+    @lyra_type_id = liti
   end
 end
 
@@ -201,75 +216,95 @@ def setup_core_functions
   # "Primitive" operators. They are overridden in the core library of
   # Lyra as `=`, `<`, `>`, ... and can be extended there later on for
   # different types.
-add_fn(:"p=", 2)             { |args, _| first(args) == second(args) }
-add_fn(:"p<", 2)             { |args, _| first(args) < second(args) }
-add_fn(:"p>", 2)             { |args, _| first(args) > second(args) }
-add_fn(:"p+", 2)             { |args, _| first(args) + second(args) }
-add_fn(:"p-", 2)             { |args, _| first(args) - second(args) }
-add_fn(:"p*", 2)             { |args, _| first(args) * second(args) }
-add_fn(:"p/", 2)             { |args, _| first(args) / second(args) }
-add_fn(:"p%", 2)             { |args, _| first(args) % second(args) }
-add_fn(:"p&", 2)             { |args, _| first(args) & second(args) } # bit-and
-add_fn(:"p|", 2)             { |args, _| first(args) | second(args) } # bit-or
-add_fn(:"p^", 2)             { |args, _| first(args) ^ second(args) } # bit-xor
-add_fn(:"p<<", 2)            { |args, _| first(args) << second(args) } # bit-shift-left
-add_fn(:"p>>", 2)            { |args, _| first(args) >> second(args) } # bit-shift-right
+  add_fn(:"p=", 2)             { |args, _| first(args) == second(args) }
+  add_fn(:"p<", 2)             { |args, _| first(args) < second(args) }
+  add_fn(:"p>", 2)             { |args, _| first(args) > second(args) }
+  add_fn(:"p+", 2)             { |args, _| first(args) + second(args) }
+  add_fn(:"p-", 2)             { |args, _| first(args) - second(args) }
+  add_fn(:"p*", 2)             { |args, _| first(args) * second(args) }
+  add_fn(:"p/", 2)             { |args, _| first(args) / second(args) }
+  add_fn(:"p%", 2)             { |args, _| first(args) % second(args) }
+  add_fn(:"p&", 2)             { |args, _| first(args) & second(args) } # bit-and
+  add_fn(:"p|", 2)             { |args, _| first(args) | second(args) } # bit-or
+  add_fn(:"p^", 2)             { |args, _| first(args) ^ second(args) } # bit-xor
+  add_fn(:"p<<", 2)            { |args, _| first(args) << second(args) } # bit-shift-left
+  add_fn(:"p>>", 2)            { |args, _| first(args) >> second(args) } # bit-shift-right
 
-add_fn(:list, -1)            { |args, _| args }
-add_fn(:car, 1)              { |args, _| first(args).car }
-add_fn(:cdr, 1)              { |args, _| first(args).cdr }
-add_fn(:cons, 2)             { |args, _| Cons.new(first(args), second(args)) }
-add_fn(:"set-car!", 2)       { |args, _| first(args).car = second(args) }
-add_fn(:"set-cdr!", 2)       { |args, _| first(args).cdr = second(args) }
+  add_fn(:list, -1)            { |args, _| args }
+  add_fn(:car, 1)              { |args, _| first(args).car }
+  add_fn(:cdr, 1)              { |args, _| first(args).cdr }
+  add_fn(:cons, 2)             { |args, _| Cons.new(first(args), second(args)) }
+  add_fn(:pcons, 3)            { |args, _| c = Cons.new(first(args), second(args)); c.lyra_type_id = third(args); c }
+  add_fn(:"set-car!", 2)       { |args, _| first(args).car = second(args) }
+  add_fn(:"set-cdr!", 2)       { |args, _| first(args).cdr = second(args) }
 
-add_fn(:vector, -1)          { |args, _| args.to_a }
-add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }
-add_fn(:"vector-set!", 3)    { |args, _| first(args)[second(args)] = third(args)
-                                first(args) }
-add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
-                                first(args) }
-add_fn(:"vector-size", 1)    { |args, _| first(args).size }
+  add_fn(:pvector, 1, -1)      { |args, _| r = args.cdr.to_a; r.lyra_type_id = args.car; r }
+  add_fn(:vector, -1)          { |args, _| args.to_a }
+  add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }
+  add_fn(:"vector-set!", 3)    { |args, _| first(args)[second(args)] = third(args)
+                                  first(args) }
+  add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
+                                  first(args) }
+  add_fn(:"vector-size", 1)    { |args, _| first(args).size }
 
-add_fn(:null?, 1)            { |args, _| first(args).nil? }
-add_fn(:cons?, 1)            { |args, _| first(args).is_a?(Cons)}
-add_fn(:int?, 1)             { |args, _| first(args).is_a?(Integer)}
-add_fn(:float?, 1)           { |args, _| first(args).is_a?(Float)}
-add_fn(:bool?, 1)            { |args, _| first(args) == true || first(args) == false}
-add_fn(:string?, 1)          { |args, _| first(args).is_a?(String)}
-add_fn(:vector?, 1)          { |args, _| first(args).is_a?(Array)}
-add_fn(:symbol?, 1)          { |args, _| first(args).is_a?(Symbol)}
+  # Returns an integer representing an arbitrary id for the type of the
+  # argument. It can be check using (bit-match ..).
+  add_fn(:"lyra-type-id", 1) do |args, _|
+    e = first(args)
+    if e.respond_to?(:lyra_type_id) && (lti = first(args).lyra_type_id) != nil
+      lti
+    else
+      case e
+      when nil          then 0b00000000
+      when Cons         then 0b00000001
+      when Integer      then 0b00000010
+      when Float        then 0b00000100
+      when true, false  then 0b00001000
+      when String       then 0b00010000
+      when Array        then 0b00100000
+      when Symbol       then 0b01000000
+      else nil
+      end
+    end
+  end
 
-add_fn(:int, 1)              { |args, _| first(args).to_i }
-add_fn(:float, 1)            { |args, _| first(args).to_f }
-add_fn(:string, 1)           { |args, _| first(args).to_s }
-add_fn(:bool, 1)             { |args, _| !!first(args) }
+  add_fn(:"bit-match?", 2)     { |args, _| !(first(args).nil? || second(args).nil?) && (first(args) & second(args)) != 0 }
 
-add_fn(:sprint!, 2)          { |args, _| first(args).print(second(args))}
-add_fn(:sread!, 1)           { |args, _| first(args).gets }
-add_fn(:slurp!, 1)           { |args, _| IO.read(first(args)) }
-add_fn(:spit!, 2)            { |args, _| IO.write(first(args), second(args)) }
+  add_fn(:int, 1)              { |args, _| first(args).to_i }
+  add_fn(:float, 1)            { |args, _| first(args).to_f }
+  add_fn(:string, 1)           { |args, _| first(args).to_s }
+  add_fn(:bool, 1)             { |args, _| !!first(args) }
 
-add_fn(:eval!, 1)            { |args, env| eval_keep_last(first(args), env) }
-add_fn(:"call-with-env!", 2) { |args, _| args.car.call(args.cdr.car) }
-add_fn(:parse, 1)            { |args, env| s = first(args)
-                                make_ast(tokenize(s)) }
+  add_fn(:sprint!, 2, 3)       do |args, env|
+    s = second(args).to_s
+    s = third(args).call(Cons.new(s, nil), env) if list_len(args) == 3
+    first(args).print(s)
+  end
+  
+  add_fn(:sread!, 1)           { |args, _| first(args).gets }
+  add_fn(:slurp!, 1)           { |args, _| IO.read(first(args)) }
+  add_fn(:spit!, 2)            { |args, _| IO.write(first(args), second(args)) }
 
-add_fn(:env!, 0)             { |_, env| env }
-add_fn(:"global-env!", 0)    { |_, _| LYRA_ENV.cdr }
-add_fn(:time!, 0)            { |_, _| Time.now.to_f }
-add_fn(:"call-stack!", 0)    { |_, _| $lyra_call_stack }
+  add_fn(:eval!, 1)            { |args, env| eval_keep_last(first(args), env) }
+  add_fn(:"call-with-env!", 2) { |args, _| args.car.call(args.cdr.car) }
+  add_fn(:parse, 1)            { |args, env| s = first(args)
+                                  make_ast(tokenize(s)) }
 
-add_fn(:measure, 2)          { |args, env|
-                                t = Time.now
-                                first(args).times do |_|
-                                  second(args).call(nil, env)
-                                end
-                                Time.now - t }
+  add_fn(:"global-env!", 0)    { |_, _| LYRA_ENV.cdr }
+  add_fn(:time!, 0)            { |_, _| Time.now.to_f }
+  add_fn(:"call-stack!", 0)    { |_, _| $lyra_call_stack }
 
-add_fn(:"p-hash", 1)           { |args, _| first(args).hash }
+  add_fn(:measure, 2)          { |args, env|
+                                  t = Time.now
+                                  first(args).times do |_|
+                                    second(args).call(nil, env)
+                                  end
+                                  Time.now - t }
 
-add_var(:stdin, $stdin)
-add_var(:stdout, $stdout)
+  add_fn(:"p-hash", 1)           { |args, _| first(args).hash }
+
+  add_var(:stdin, $stdin)
+  add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
 
   true

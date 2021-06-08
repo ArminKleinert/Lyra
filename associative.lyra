@@ -7,7 +7,10 @@
 
 (define MAP-NUM-BUCKETS 1024)
 
-(define (make-map) (vector))
+(define (map? m) (bit-match? (lyra-type-id m) 0b10000000))
+
+; Corresponds to its own type and vector
+(define (make-map) (pvector 0b10100000))
 
 ; Needs a re-work
 (define (map-to-string m)
@@ -73,8 +76,14 @@
     (find-in-bucket bucket key)))
 
 
-
-
+(let ((c (make-map))
+      (v (vector)))
+  (println! c)
+  (println! (bit-match? 0b00100000 0b10000000))
+  (println! (map? c))
+  (println! (lyra-type-id c))
+  (println! (vector? c))
+  (println! (map? (vector))))
 
 (comment
 (let ((m0 (make-map))
@@ -92,3 +101,8 @@
     (remove-from-map! m0 'a)
     (println! (get-value m0 'a)))
 )
+
+
+
+
+

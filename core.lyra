@@ -12,6 +12,16 @@
 ;;;;; SECTION Basic operations and operators
 ;;;;;
 
+(define (null? e)   (bit-match? (lyra-type-id e) 0b00000000))
+(define (cons? e)   (bit-match? (lyra-type-id e) 0b00000001))
+(define (int? e)    (bit-match? (lyra-type-id e) 0b00000010))
+(define integer? int?)
+(define (float? e)  (bit-match? (lyra-type-id e) 0b00000100))
+(define (bool? e)   (bit-match? (lyra-type-id e) 0b00001000))
+(define (string? e) (bit-match? (lyra-type-id e) 0b00010000))
+(define (vector? e) (bit-match? (lyra-type-id e) 0b00100000))
+(define (symbol? e) (bit-match? (lyra-type-id e) 0b01000000))
+
 ; Boolean and
 (def-macro (and x y)
   (list 'if x y #f))
@@ -33,9 +43,7 @@
   )
 
 (define (atom? e)
-  (cond ((null? e) #f)
-        ((vector? e) #f)
-        ((cons? e) #f #t)))
+  (bit-match? e 0b1011110))
 
 (define (number? e)
   (or (int? e) (float? e)))
@@ -78,6 +86,13 @@
 (define (dec n) (- n 1))
 
 ;;;;;
+;;;;; SECTION String transformation
+;;;;;
+
+(define (to-string e)
+  (string e))
+
+;;;;;
 ;;;;; SECTION Simple IO
 ;;;;;
 
@@ -87,11 +102,11 @@
 
 ; Prints a string to stdout.
 (define (print! s)
-  (sprint! stdout s))
+  (sprint! stdout s to-string))
 
 ; Prints a string to stdout followed by a new line.
 (define (println! s)
-  (sprint! stdout s)
+  (sprint! stdout s to-string)
   (sprint! stdout "\n"))
 
 ; Prints the elements of a list, separated by newlines.
@@ -268,12 +283,13 @@
 (define (cpy-vector v)
   (cpy-vector-range v 0 (dec (vector-size v))))
 
+; Copies a vector and keeps its type-id (if overridden) in place.
 (define (cpy-vector-range v start end)
   (let* (iter (lambda (i nv)
           (if (> i end)
             nv
             (iter (inc i) (vector-append! nv (vector-get v i))))))
-    (iter start (vector))))
+    (iter start (pvector (lyra-type-id v)))))
 
 
 ;;; SUBSECT: Appending lists and vectors
@@ -398,7 +414,8 @@
 ; Calculate the hash-code of an object.
 (define (hash-code e)
   (let* (code (hash-code-helper e))
-    (bit-xor code (>> code 10))))
+    ;(bit-xor code (>> code 10))
+    code))
 
 ;;;;;
 ;;;;; SECTION : Tests
@@ -406,13 +423,13 @@
 
 (comment
 
-(println! (reverse (list 1 2 3 4 5)))
-
 (let* (v (vector))
   (vector-set! v 1000 '())
-  (println! (measure 5 (lambda () (foldl (lambda (s e) s) '() v))))
+  (println! (measure 1 (lambda () (foldl (lambda (s e) s) '() v))))
   (let* (l (vector->list v))
-    (println! (measure 5 (lambda () (foldl (lambda (s e) s) '() l))))))
+    (println! (measure 1 (lambda () (foldl (lambda (s e) s) '() l))))))
+
+(println! (reverse (list 1 2 3 4 5)))
 
 (println! (hash-code "abc"))
 (println! (hash-code 'abc))

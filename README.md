@@ -36,7 +36,8 @@ Lyra is a lisp I make for fun and learning.
 
 `(cond <clauses>)` Each clause has the form `(<predicate> <expr>)`.  
 Example:
-```(cond ((vector? e) (foo e)) 
+```
+(cond ((vector? e) (foo e)) 
 ((list? e) (bar e)) 
 #t (baz e))
 ```  

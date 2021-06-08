@@ -31,17 +31,13 @@ Lyra is a lisp I make for fun and learning.
 `(define <symbol> <value>)` Assigns a value to a symbol.  
 `(lambda (<args>) <body>)` A function.  
 `(define (<name> <args>) <body>)` Short for `(define <name> (lambda (<args>) <body>))`.  
-`(cons <e0> <e1>)` Creates a pair of elements.  
-`(car <pair>)` Get the first element of a Cons.  
-`(cdr <pair>)` Get the second element of a Cons / the rest of a list.  
-`(list ...)` Creates a list (chained conses).  
 `(if <predicate> <then> <else>)` Common if. Executes the predicate. If it is true, evaluates `then`, if not, evaluates `else`.
 `(cond <clauses>)` Each clause has the form `(<predicate> <expr>)`. Example: `(cond ((vector? e) (foo e)) 
 ((list? e) (bar e)) 
 #t (baz e))`
 
 ```
-Notice! Any functionf marked with '!' should only be used if you know what
+Notice! Any function marked with '!' should only be used if you know what
 you are doing!
 
 Natively implemented:

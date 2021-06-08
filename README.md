@@ -31,10 +31,13 @@ Lyra is a lisp I make for fun and learning.
 `(define <symbol> <value>)` Assigns a value to a symbol.  
 `(lambda (<args>) <body>)` A function.  
 `(define (<name> <args>) <body>)` Short for `(define <name> (lambda (<args>) <body>))`.  
-`(if <predicate> <then> <else>)` Common if. Executes the predicate. If it is true, evaluates `then`, if not, evaluates `else`.
-`(cond <clauses>)` Each clause has the form `(<predicate> <expr>)`. Example: `(cond ((vector? e) (foo e)) 
+`(if <predicate> <then> <else>)` Common if. Executes the predicate. If it is true, evaluates `then`, if not, evaluates `else`.  
+
+`(cond <clauses>)` Each clause has the form `(<predicate> <expr>)`.  
+Example:
+```(cond ((vector? e) (foo e)) 
 ((list? e) (bar e)) 
-#t (baz e))`
+#t (baz e))```  
 
 ```
 Notice! Any function marked with '!' should only be used if you know what
@@ -140,6 +143,18 @@ map                  | 2     |
 map!                 | 2     | Impure map. Modifies the each element. (!)
 filter               | 2     | 
 ; TODO Update the list above.
+
+associative.lyra functions:
+Function             | Arity | Description
+---------------------+-------+------------------------------------------------------------
+make-map             | 0     | 
+map-to-string        | 1     | (Needs a re-work)
+add-entry            | 3     | Adds an entry to a map and returns a new map. If the key 
+                     |       | already exists, it is replaced.
+add-entry!           | 3     | Adds or replaces an entry. The map is mutated.
+remove-from-map      | 2     | Removes an entry from a map and returns a new map.
+remove-from-map!     | 2     | Removes an entry from a map. The map is mutated.
+get-value            | 2     | Gets a value from the map.
 
 Untested: filter, and, or, not, foldl, foldr, map!
 

@@ -38,8 +38,8 @@ Lyra is a lisp I make for fun and learning.
 Example:
 ```
 (cond ((vector? e) (foo e)) 
-((list? e) (bar e)) 
-#t (baz e))
+      ((list? e) (bar e)) 
+      (#t (baz e)))
 ```  
 
 ```

@@ -298,8 +298,10 @@
     
 ;;; SUBSECT reversal
     
-(define (reverse-list xs)
-  (foldl cons '() xs))
+(define (reverse xs)
+  (foldl
+    (lambda (res e) (cons e res))
+    '() xs))
 
 ;;; SUBSECT Conversion between lists and vectors.
 
@@ -399,6 +401,8 @@
 ;;;;;
 ;;;;; SECTION : Tests
 ;;;;;
+
+(println! (reverse (list 1 2 3 4 5)))
 
 (comment
 

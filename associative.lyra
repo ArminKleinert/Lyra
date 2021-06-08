@@ -1,0 +1,124 @@
+
+(define MAP-NUM-BUCKETS 1024)
+
+(define (make-map) (vector))
+
+(define (map-to-string m)
+  (+
+    (foldl
+      (lambda (s e) (if (empty? e) s (+ (+ s (string e)) " ")))
+      "{ " m)
+    "}"))
+    
+(define (bucket-index key) (% (hash-code key) MAP-NUM-BUCKETS))
+
+(define (select-bucket m key)
+  (let* (index (bucket-index key))
+    (select-bucket-by-index m index)))
+
+(define (select-bucket-by-index m index)
+    (if (< index (vector-size m))
+      (vector-get m index)
+      '()))
+
+(define (add-entry m key val)
+  (add-entry! (cpy-vector m) key val))
+
+(define (add-entry! m key val)
+  (let ((index (bucket-index key))
+        (bucket (select-bucket-by-index m index))
+        (new-bucket (cons (cons key val) bucket)))
+    (vector-set! m index new-bucket)
+    m))
+
+(define (find-predecessor-in-bucket b p key)
+  (cond ((empty? b) '())
+        ((= (ffirst b) key) p)
+        (#t (find-predecessor-in-bucket (rest b) p key))))
+
+(define (remove-from-bucket b key)
+  (foldl
+    (lambda (res current)
+      (cond ((= (first current) key) res)
+            (#t (cons res current))))
+    '() b))
+
+(define (remove-from-map m key)
+  (remove-from-map! (cpy-vector m) key))
+
+(define (remove-from-map! m key)
+  (let* (index (bucket-index key))
+    (if (>= index (vector-size m))
+      m
+      (let ((bucket (select-bucket-by-index m index))
+            (new-bucket (remove-from-bucket bucket key)))
+        (vector-set! m index new-bucket))
+      m)))
+
+(define (find-in-bucket b key)
+  (cond ((empty? b) '())
+        ((= (ffirst b) key) (rfirst b))
+        (#t (find-in-bucket (rest b) key))))
+
+(define (get-value m key)
+  (let ((code (hash-code key))
+        (bucket (select-bucket m code)))
+    (find-in-bucket bucket key)))
+
+
+
+
+
+
+
+
+(comment
+(let ((m0 (make-map))
+      (m1 (make-map)))
+    (println! (map-to-string m0))
+    (add-entry! m0 'a 198)
+    (println! (map-to-string m0))
+    (println! (get-value m0 'a))
+    (add-entry m0 'b 891)
+    (println! (map-to-string m0))
+    (println! (get-value m0 'a))
+    (println! (get-value m0 'b))
+    (remove-from-map m0 'a)
+    (println! (get-value m0 'a))
+    (remove-from-map! m0 'a)
+    (println! (get-value m0 'a)))
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

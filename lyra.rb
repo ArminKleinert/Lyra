@@ -237,6 +237,7 @@ add_fn(:float?, 1)           { |args, _| first(args).is_a?(Float)}
 add_fn(:bool?, 1)            { |args, _| first(args) == true || first(args) == false}
 add_fn(:string?, 1)          { |args, _| first(args).is_a?(String)}
 add_fn(:vector?, 1)          { |args, _| first(args).is_a?(Array)}
+add_fn(:symbol?, 1)          { |args, _| first(args).is_a?(Symbol)}
 
 add_fn(:int, 1)              { |args, _| first(args).to_i }
 add_fn(:float, 1)            { |args, _| first(args).to_f }
@@ -265,7 +266,7 @@ add_fn(:measure, 2)          { |args, env|
                                 end
                                 Time.now - t }
 
-add_fn(:"hash", 1)           { |args, _| first(args).hash }
+add_fn(:"p-hash", 1)           { |args, _| first(args).hash }
 
 add_var(:stdin, $stdin)
 add_var(:stdout, $stdout)
@@ -341,7 +342,7 @@ def eval_list(expr_list, env)
   if expr_list.nil?
     nil
   else
-    Cons.new(eval_ly(first(expr_list), env), eval_list(rest(expr_list), env))
+    Cons.new(eval_ly(first(expr_list), env, true), eval_list(rest(expr_list), env))
   end
 end
 
@@ -428,7 +429,7 @@ def evlambda(args_expr, body_expr, ismacro = false)
 end
 
 # Evaluation function
-def eval_ly(expr, env)
+def eval_ly(expr, env, is_in_call_params=false)
   if expr.nil?
     nil # nil evaluates to nil
   elsif expr.is_a?(Symbol)
@@ -517,7 +518,7 @@ def eval_ly(expr, env)
       # environment in reverse order since they are each appended to the
       # beginning).
       while bindings
-        env1 = Cons.new(Cons.new(bindings.car.car, eval_ly(bindings.car.cdr.car)), env1)
+        env1 = Cons.new(Cons.new(bindings.car.car, eval_ly(bindings.car.cdr.car, env1)), env1)
         bindings = bindings.cdr
       end
       
@@ -568,7 +569,7 @@ def eval_ly(expr, env)
         # So `(define (dotimes n f)
         #       (if (= 0 n) '() (begin (f) (dotimes (dec n) f))))`
         # will also tail call.
-        if (!func.native?) && (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
+        if !is_in_call_params && !func.native? && (!$lyra_call_stack.nil?) && (func == $lyra_call_stack.car)
           # Evaluate arguments that will be passed to the call.
           args = eval_list(args, env)
           # Tail call

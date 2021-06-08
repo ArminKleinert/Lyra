@@ -15,6 +15,7 @@ Lyra is a lisp I make for fun and learning.
 - Macros  
 - Tail recursion  
 - Access to the environment for people who know what they are doing.  
+- Basic implementation for maps.  
 - Many TODOs :D
 
 ## Types:
@@ -35,6 +36,9 @@ Lyra is a lisp I make for fun and learning.
 `(cdr <pair>)` Get the second element of a Cons / the rest of a list.  
 `(list ...)` Creates a list (chained conses).  
 `(if <predicate> <then> <else>)` Common if. Executes the predicate. If it is true, evaluates `then`, if not, evaluates `else`.
+`(cond <clauses>)` Each clause has the form `(<predicate> <expr>)`. Example: `(cond ((vector? e) (foo e)) 
+((list? e) (bar e)) 
+#t (baz e))`
 
 ```
 Notice! Any functionf marked with '!' should only be used if you know what
@@ -71,6 +75,8 @@ cons?                | 1     | Checks whether the value is a cons.
 int?                 | 1     | Checks whether the value is a int.
 float?               | 1     | Checks whether the value is a float.
 string?              | 1     | Checks whether the value is a string.
+vector?              | 1     | Checks whether the value is a vector.
+symbol?              | 1     | Checks whether the value is a symbol.
                      |       | 
 int                  | 1     | Tries to convert a value to an int.
 float                | 1     | Tries to convert a value to a float.
@@ -134,6 +140,7 @@ read!                | 0     | Reads a string from stdin.
 map                  | 2     | 
 map!                 | 2     | Impure map. Modifies the each element. (!)
 filter               | 2     | 
+; TODO Update the list above.
 
 Untested: filter, and, or, not, foldl, foldr, map!
 
@@ -155,7 +162,9 @@ Quoted expressions: Currently, the `'` prefix only works on the empty list and s
 "Curried" lambdas like the following: `(lambda (n) (lambda (m) (+ n m)))`  
 This will fail because `n` won't be found when the inner lambda is called. The same happens with lambdas inside a `let*`.
 
-A `cond` macro.
+## Issues
+
+`foldl` is very, very slow for vectors. Maybe another native function for iterating vectors would do wonders.
 
 ## Videos:
 

@@ -391,11 +391,9 @@
          ((symbol? e) (+ (<< (p-hash (string e)) 1) 1))
          (#t 0)))
 
-; Calculate the hash-code of an object, then spread it out
-; and limit to 32 bits.
+; Calculate the hash-code of an object.
 (define (hash-code e)
   (let* (code (hash-code-helper e))
-    ;(& (bit-xor code (>> code 10)) 0xFFFFFFFF)
     code))
 
 ;;;;;
@@ -404,12 +402,11 @@
 
 (comment
 
-(let ((v (vector))
-      (l (vector->list v)))
-  (vector-set! v 10000 '())
-  (println! (measure 1 (lambda () (foldl (lambda (s e) s) '() v))))
-  (println! (measure 1 (lambda () (foldl (lambda (s e) s) '() l))))
-  )
+(let* (v (vector))
+  (vector-set! v 1000 '())
+  (println! (measure 5 (lambda () (foldl (lambda (s e) s) '() v))))
+  (let* (l (vector->list v))
+    (println! (measure 5 (lambda () (foldl (lambda (s e) s) '() l))))))
 
 (println! (hash-code "abc"))
 (println! (hash-code 'abc))

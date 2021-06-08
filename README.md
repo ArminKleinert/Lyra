@@ -45,7 +45,8 @@ Function             | Arity | Description
 ---------------------+-------+------------------------------------------------------------
 define               | any   | Adds a variable or function to the global (!) environment.
 lambda               | any   | Creates a new anonymous function.
-let*                 | any   | Adds a single variable to the local environment.
+let*                 | >=1   | Adds a single variable to the local environment.
+let                  | >=1   | Like let* but for multiple variables.
                      |       | 
 =                    | 2     | Checks 2 values for equality.
 <                    | 2     | Checks whether the first argument is less than the second.
@@ -91,7 +92,7 @@ env!                 | 0     | Gets the current (local) environment. Highly unsa
 global-env!          | 0     | Like env!, but ignores the local environment. Also unsafe.
                      |       | 
 time!                | 0     | Get the current time in seconds as a floating point number.
-measure              | 2     | Runs a function (1st argument) n (2nd argument) times.
+measure              | 2     | Runs a function (2nd argument) n (1st argument) times.
 
 Untested: sprint!, sread!, slurp!, spit!, env!
 
@@ -110,10 +111,12 @@ first                | 1     | First element of a collection.
 second               | 1     | Second element of a collection.
 third                | 1     | Third element of a collection.
 rest                 | 1     | Rest element of a collection.
+ffirst               | 1     | Alias for (first (first e))
+sfirst               | 1     | Alias for (second (first e))
+rfirst               | 1     | Alias for (rest (first e))
 length               | 1     | Length of a collection. 0 for atomic types.
 begin                | 2     | Takes two arguments and executes them both.
                      |       | 
-last-entry           | 1     | Find the last entry (cell) in a cons.
 deprioritise-helper! |       | Helper for deprioritise!. Do not use or override!
 deprioritise!        | 1     | Moves a variable (if found) to the end of the global
                      |       | environment.
@@ -153,14 +156,12 @@ nil      | Alias for '().
 
 ## Missing features:
 
-Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.
+Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.  
 
 "Curried" lambdas like the following: `(lambda (n) (lambda (m) (+ n m)))`  
-This will fail because `n` won't be found when the inner lambda is called. The same happens with lambdas inside a `let*`.
+This will fail because `n` won't be found when the inner lambda is called. The same happens with lambdas inside a `let*`.  
 
-## Issues
-
-`foldl` is very, very slow for vectors. Maybe another native function for iterating vectors would do wonders.
+A module-system to prevent messing with core-function-names. (Can easily happen when using `define`)  
 
 ## Videos:
 

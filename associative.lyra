@@ -1,8 +1,15 @@
 
+; This file gives a basic implementation for maps.
+; A map is made of a vector with a fix number of elements.
+; The elements are called "buckets" and are found by index
+; The buckets are build like the lisp environment:
+; A list of pairs, each consisting of a key and a value.
+
 (define MAP-NUM-BUCKETS 1024)
 
 (define (make-map) (vector))
 
+; Needs a re-work
 (define (map-to-string m)
   (+
     (foldl
@@ -70,9 +77,6 @@
 
 
 
-
-
-(comment
 (let ((m0 (make-map))
       (m1 (make-map)))
     (println! (map-to-string m0))
@@ -87,7 +91,7 @@
     (println! (get-value m0 'a))
     (remove-from-map! m0 'a)
     (println! (get-value m0 'a)))
-)
+
 
 
 

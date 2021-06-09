@@ -204,6 +204,7 @@ end
 # Sets up the core functions and variables. The functions defined here are
 # of the type NativeLyraFn instead of LyraFn. They can not make use of tail-
 # recursion and are supposed to be very simple.
+  BREAK_LOOP_OBJ = BasicObject.new
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
     entry = Cons.new(name, NativeLyraFn.new(name, false, min_args, max_args, &body))
@@ -246,6 +247,16 @@ def setup_core_functions
   add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
                                   first(args) }
   add_fn(:"vector-size", 1)    { |args, _| first(args).size }
+  add_fn(:"vector-iterate", 3) { |args, env| r = nil
+                                 accumulator = second(args)
+                               f = third(args)
+                               first(args).each_with_index do |e,i|
+                                 r = f.call(list(accumulator, e,i), env)
+                                 break if r.__id__ == BREAK_LOOP_OBJ.__id__
+                                 accumulator = r
+                               end
+                               r }
+  add_fn(:"break!",0)          { |_, _| BREAK_LOOP_OBJ }
 
   # Returns an integer representing an arbitrary id for the type of the
   # argument. It can be check using (bit-match ..).

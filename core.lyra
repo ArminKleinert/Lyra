@@ -12,7 +12,7 @@
 ;;;;; SECTION Basic operations and operators
 ;;;;;
 
-(define (null? e)   (bit-match? 0b00000000 (lyra-type-id e)))
+(define (null? e)   (= (lyra-type-id e) 0))
 (define (cons? e)   (bit-match? 0b00000001 (lyra-type-id e)))
 (define (int? e)    (bit-match? 0b00000010 (lyra-type-id e)))
 (define integer? int?)
@@ -43,7 +43,7 @@
   )
 
 (define (atom? e)
-  (bit-match? e 0b1011110))
+  (bit-match? 0b1011110 (lyra-type-id e)))
 
 (define (number? e)
   (or (int? e) (float? e)))
@@ -239,12 +239,11 @@
 ;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
 
 ; Fold left (Vector)
+
 (define (vfoldl f start v)
-  (let* (iter (lambda (i val)
-          (if (= i (vector-size v))
-            val
-            (iter (inc i) (f val (vector-get v i))))))
-    (iter 0 start)))
+  (vector-iterate
+    v start
+    (lambda (acc e i) (f acc e))))
 
 ; Fold left (Cons)
 (define (cfoldl f start coll)
@@ -269,13 +268,9 @@
 
 ; map for vectors
 (define (map-vector f v)
-  (let* (iter-fn
-          (lambda (i nv)
-            (if (= (vector-size v) i)
-              nv
-              (iter-fn (inc i)
-                (vector-append! nv (f (vector-get v i)))))))
-    (iter-fn 0 (vector))))
+  (vector-iterate
+    v (cleared-vector v)
+    (lambda (acc e i) (vector-append! acc (f e)))))
 
 ; map for conses
 (define (map-list f xs)
@@ -301,12 +296,9 @@
 ;;; SUBSECT: Filter a list xs by a predicate f.
 
 (define (filter-vector f v)
-  (let* (iter (lambda (i nv)
-          (cond ((>= i (vector-size v)) nv)
-                ((f (vector-get v i)) (iter (inc i) (vector-append! nv (vector-get v i))))
-                (#t (iter (inc i) nv)))))
-    (iter 0 (vector))))
-
+  (vector-iterate v (cleared-vector v)
+    (lambda (acc e i) (if (f e) (vector-append! acc e) acc))))
+    
 (define (filter-list f xs)
   (if (empty? xs)
     '()
@@ -325,13 +317,14 @@
 (define (cpy-vector v)
   (cpy-vector-range v 0 (dec (vector-size v))))
 
+(define (cleared-vector v)
+  (pvector (lyra-type-id v)))
+
 ; Copies a vector and keeps its type-id (if overridden) in place.
+
 (define (cpy-vector-range v start end)
-  (let* (iter (lambda (i nv)
-          (if (> i end)
-            nv
-            (iter (inc i) (vector-append! nv (vector-get v i))))))
-    (iter start (pvector (lyra-type-id v)))))
+  (vector-iterate v (pvector (lyra-type-id v))
+    (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append! acc e)))))
 
 
 ;;; SUBSECT: Appending lists and vectors
@@ -343,6 +336,7 @@
     c1
     (cons (first c0) (append-list (rest c0) c1))))
 
+; TODO with vector-iterate
 ; Appends a vector to another.
 (define (vector-append-multi v0 v1)
   (let* (iter (lambda (i nv)
@@ -369,6 +363,7 @@
   (foldl (lambda (v x) (vector-append! v x))
          (vector) ls))
 
+; TODO with vector-iterate
 (define (vector->list v)
   (let* (iter (lambda (i nl)
           (if (< i 0)
@@ -463,13 +458,17 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
-(comment
+(define (range n m acc)
+  (if (> n m)
+    acc
+    (range (inc n) m (vector-append! acc n))))
 
-(let* (v (vector))
-  (vector-set! v 1000 '())
-  (println! (measure 1 (lambda () (foldl (lambda (s e) s) '() v))))
+(let* (v (range 0 100 (vector)))
+  (println! (measure 100 (lambda () (filter (lambda (e) (even? e)) v))))
   (let* (l (vector->list v))
-    (println! (measure 1 (lambda () (foldl (lambda (s e) s) '() l))))))
+    (println! (measure 100  (lambda () (filter (lambda (e) (even? e)) l))))))
+
+(comment
 
 (println! (reverse (list 1 2 3 4 5)))
 

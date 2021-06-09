@@ -14,7 +14,7 @@
 ; Corresponds to its own type and vector
 (define (make-map) (pvector 0b10100000))
 
-; Needs a re-work
+; TODO Needs a re-work
 (define (map-to-string m)
   (+
     (foldl

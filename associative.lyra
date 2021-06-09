@@ -7,7 +7,9 @@
 
 (define MAP-NUM-BUCKETS 1024)
 
-(define (map? m) (bit-match? (lyra-type-id m) 0b10000000))
+(add-lyra-string-transformer! 0b10100000 (lambda (e) "MAP")) ; TODO
+
+(define (map? m) (bit-match? 0b10000000 (lyra-type-id m)))
 
 ; Corresponds to its own type and vector
 (define (make-map) (pvector 0b10100000))
@@ -78,12 +80,18 @@
 
 (let ((c (make-map))
       (v (vector)))
+  (println! ((get-lyra-string-transformer-by-type-id (lyra-type-id c)) c))
+  (println! (to-string c))
   (println! c)
-  (println! (bit-match? 0b00100000 0b10000000))
   (println! (map? c))
   (println! (lyra-type-id c))
   (println! (vector? c))
-  (println! (map? (vector))))
+  (println! (list))
+  (println! (list 1 2))
+  (println! (pcons 4 5 1))
+  (println! (vector))
+  (println! (map? (vector)))
+  )
 
 (comment
 (let ((m0 (make-map))

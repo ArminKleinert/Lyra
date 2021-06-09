@@ -16,6 +16,7 @@ Lyra is a lisp I make for fun and learning.
 - Tail recursion  
 - Access to the environment for people who know what they are doing.  
 - Basic implementation for maps.  
+- Basic implementation for user-defined types. (Description far below)  
 - Many TODOs :D
 
 ## Types:
@@ -26,6 +27,7 @@ Lyra is a lisp I make for fun and learning.
 - Boolean (#t, #f)  
 - Function  
 - Vector   
+- Map  
 
 ## Basic commands:
 
@@ -80,6 +82,10 @@ float?               | 1     | Checks whether the value is a float.
 string?              | 1     | Checks whether the value is a string.
 vector?              | 1     | Checks whether the value is a vector.
 symbol?              | 1     | Checks whether the value is a symbol.
+                     |       |
+bit-match?           | 2     | Takes 2 integers as arguments. If either of them is nil,
+                     |       | return #f. Otherwise, return the result of the following:
+                     |       | (= (& (first args) (second args)) (first args))
                      |       | 
 int                  | 1     | Tries to convert a value to an int.
 float                | 1     | Tries to convert a value to a float.
@@ -150,6 +156,7 @@ filter               | 2     |
 associative.lyra functions:
 Function             | Arity | Description
 ---------------------+-------+------------------------------------------------------------
+map?                 | 1     | 
 make-map             | 0     | 
 map-to-string        | 1     | (Needs a re-work)
 add-entry            | 3     | Adds an entry to a map and returns a new map. If the key 
@@ -170,6 +177,31 @@ stdin    | Standard input stream.
 stdout   | Standard output stream.
 stderr   | Standard error stream.
 nil      | Alias for '().
+```
+
+## User defined types:
+
+- User-defined types can use either cons-cells or a vector as a foundation.  
+- Choose a type id. It should be written out as a bit-mask, like `0b10000000`  
+  - By matching other types, their implementations for some funtions, like `to-string` can be used, if your type doesn't have its own.  
+  - For example, the type-id of objects created using `(make-map)` is `0b10100000`, which matches both the type-ids of Map and Vector. Thus, `vector?` returns `#t` for Map-instances and functions like `foldl` and `filter` become available.  
+  - Whatever type-id you choose, the lowest 12 bits are reserved for the core library.  
+- Create a `<type>?` function. Example: `(define (map? m) (bit-match? (lyra-type-id m) 0b10000000))`  
+- Create a `make-<type>` function. Here you create an empty instance of your type. The function should call either `pvector` or `pcons`. Example: `(define (make-map) (pvector 0b10100000))`  
+- Use `(add-lyra-string-transformer! <type-id> <your-to-string>)`. Example: `(add-lyra-string-transformer! 0b10100000 (lambda (e) ...))`  
+- If you provide a bit-mask that doesn't match anything or never call `add-lyra-string-transformer!` for your type, the interpreter will default to a native implementation.  
+
+```
+Pre-defined type-ids:
+'()     0b00000000 (0)
+Cons    0b00000001 (1)
+Integer 0b00000010 (2)
+Float   0b00000100 (4)
+Boolean 0b00001000 (8)
+String  0b00010000 (16)
+Vector  0b00100000 (32)
+Symbol  0b01000000 (64)
+Map     0b10000000 (128)
 ```
 
 ## Missing features:

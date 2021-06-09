@@ -12,15 +12,15 @@
 ;;;;; SECTION Basic operations and operators
 ;;;;;
 
-(define (null? e)   (bit-match? (lyra-type-id e) 0b00000000))
-(define (cons? e)   (bit-match? (lyra-type-id e) 0b00000001))
-(define (int? e)    (bit-match? (lyra-type-id e) 0b00000010))
+(define (null? e)   (bit-match? 0b00000000 (lyra-type-id e)))
+(define (cons? e)   (bit-match? 0b00000001 (lyra-type-id e)))
+(define (int? e)    (bit-match? 0b00000010 (lyra-type-id e)))
 (define integer? int?)
-(define (float? e)  (bit-match? (lyra-type-id e) 0b00000100))
-(define (bool? e)   (bit-match? (lyra-type-id e) 0b00001000))
-(define (string? e) (bit-match? (lyra-type-id e) 0b00010000))
-(define (vector? e) (bit-match? (lyra-type-id e) 0b00100000))
-(define (symbol? e) (bit-match? (lyra-type-id e) 0b01000000))
+(define (float? e)  (bit-match? 0b00000100 (lyra-type-id e)))
+(define (bool? e)   (bit-match? 0b00001000 (lyra-type-id e)))
+(define (string? e) (bit-match? 0b00010000 (lyra-type-id e)))
+(define (vector? e) (bit-match? 0b00100000 (lyra-type-id e)))
+(define (symbol? e) (bit-match? 0b01000000 (lyra-type-id e)))
 
 ; Boolean and
 (def-macro (and x y)
@@ -89,8 +89,50 @@
 ;;;;; SECTION String transformation
 ;;;;;
 
+(define LYRA-STRING-TRANSFORMERS (vector))
+
+(define (add-lyra-string-transformer! type-mask fn)
+  (vector-append! LYRA-STRING-TRANSFORMERS (cons type-mask fn)))
+
+; Try to find the first fitting transformation function in
+; LYRA-STRING-TRANSFORMERS using bit-match?. If non are found,
+; the primitive string function is returned.
+(define (get-lyra-string-transformer-by-type-id-fallback type-id)
+  (let* (iter (lambda (i)
+          (cond ((< i 0) string) ; Not found, fall back to native implementation.
+                ((bit-match? type-id (car (vector-get LYRA-STRING-TRANSFORMERS i)))
+                 (cdr (vector-get LYRA-STRING-TRANSFORMERS i)))
+                (#t (iter (dec i))))))
+    (iter (dec (vector-size LYRA-STRING-TRANSFORMERS)))))
+
+; Try to find the first fitting transformation function in 
+; LYRA-STRING-TRANSFORMERS using = on the type-id and the ids
+; of all the transformation-functions.
+(define (get-lyra-string-transformer-by-type-id type-id)
+  (let ((iter (lambda (i)
+          (cond ((= i (vector-size LYRA-STRING-TRANSFORMERS)) '())
+                ((= type-id (car (vector-get LYRA-STRING-TRANSFORMERS i)))
+                 (cdr (vector-get LYRA-STRING-TRANSFORMERS i)))
+                (#t (iter (inc i))))))
+        (transformer (iter 0)))
+    (if transformer
+      transformer
+      (get-lyra-string-transformer-by-type-id-fallback type-id))))
+
+(add-lyra-string-transformer! 0b00000000 (lambda (e) "")) ; Nil
+(add-lyra-string-transformer! 0b00000001 string) ; Cons
+(add-lyra-string-transformer! 0b00000010 string) ; Int
+(add-lyra-string-transformer! 0b00000100 string) ; Float
+(add-lyra-string-transformer! 0b00001000 (lambda (b) (if b "#t" "#f"))) ; Bool
+(add-lyra-string-transformer! 0b00010000 string) ; String
+(add-lyra-string-transformer! 0b00100000 string) ; Vector
+(add-lyra-string-transformer! 0b01000000 string) ; Symbol
+
+; Finds the right string transformation function for the given element
+; and tries to coonvert it to a string.
 (define (to-string e)
-  (string e))
+  (let* (f (get-lyra-string-transformer-by-type-id (lyra-type-id e)))
+    (f e)))
 
 ;;;;;
 ;;;;; SECTION Simple IO
@@ -101,12 +143,12 @@
   (sread! stdin))
 
 ; Prints a string to stdout.
-(define (print! s)
-  (sprint! stdout s to-string))
+(define (print! e)
+  (sprint! stdout (to-string e)))
 
 ; Prints a string to stdout followed by a new line.
-(define (println! s)
-  (sprint! stdout s to-string)
+(define (println! e)
+  (sprint! stdout e to-string)
   (sprint! stdout "\n"))
 
 ; Prints the elements of a list, separated by newlines.
@@ -114,7 +156,7 @@
   (if (empty? cs)
     '()
     (begin
-      (println! (car cs))
+      (println! (car cs) to-string)
       (printall! (cdr cs)))))
 
 ;;;;;

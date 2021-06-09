@@ -268,7 +268,7 @@ def setup_core_functions
     end
   end
 
-  add_fn(:"bit-match?", 2)     { |args, _| !(first(args).nil? || second(args).nil?) && (first(args) & second(args)) != 0 }
+  add_fn(:"bit-match?", 2)     { |args, _| !(first(args).nil? || second(args).nil?) && (first(args) & second(args)) == first(args) }
 
   add_fn(:int, 1)              { |args, _| first(args).to_i }
   add_fn(:float, 1)            { |args, _| first(args).to_f }
@@ -276,8 +276,12 @@ def setup_core_functions
   add_fn(:bool, 1)             { |args, _| !!first(args) }
 
   add_fn(:sprint!, 2, 3)       do |args, env|
-    s = second(args).to_s
-    s = third(args).call(Cons.new(s, nil), env) if list_len(args) == 3
+    s = second(args)
+    if list_len(args) == 3
+      s = third(args).call(list(s), env)
+    else
+      s = s.to_s
+    end
     first(args).print(s)
   end
   

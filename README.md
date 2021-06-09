@@ -181,27 +181,68 @@ nil      | Alias for '().
 
 ## User defined types:
 
-- User-defined types can use either cons-cells or a vector as a foundation.  
-- Choose a type id. It should be written out as a bit-mask, like `0b10000000`  
-  - By matching other types, their implementations for some funtions, like `to-string` can be used, if your type doesn't have its own.  
-  - For example, the type-id of objects created using `(make-map)` is `0b10100000`, which matches both the type-ids of Map and Vector. Thus, `vector?` returns `#t` for Map-instances and functions like `foldl` and `filter` become available.  
-  - Whatever type-id you choose, the lowest 12 bits are reserved for the core library.  
-- Create a `<type>?` function. Example: `(define (map? m) (bit-match? (lyra-type-id m) 0b10000000))`  
-- Create a `make-<type>` function. Here you create an empty instance of your type. The function should call either `pvector` or `pcons`. Example: `(define (make-map) (pvector 0b10100000))`  
-- Use `(add-lyra-string-transformer! <type-id> <your-to-string>)`. Example: `(add-lyra-string-transformer! 0b10100000 (lambda (e) ...))`  
-- If you provide a bit-mask that doesn't match anything or never call `add-lyra-string-transformer!` for your type, the interpreter will default to a native implementation.  
+- Call `add-lyra-type!` and save the value somewhere (`(define my-type-id (add-lyra-type!))`)
+- Create a `<type>?` function. (`(define (my-type? m) (type-match? (lyra-type-id m) my-type-id))`)
+- Call `add-type-basics!`. The function takes 3 arguments: 1 for string-conversion and 1 for equality-checks. Primitive variants `string` and `p=` can be used.
+- You can add more functions with `add-type-function!`
 
 ```
-Pre-defined type-ids:
-'()     0b00000000 (0)
-Cons    0b00000001 (1)
-Integer 0b00000010 (2)
-Float   0b00000100 (4)
-Boolean 0b00001000 (8)
-String  0b00010000 (16)
-Vector  0b00100000 (32)
-Symbol  0b01000000 (64)
-Map     0b10000000 (128)
+; Define a new type
+(define my-type-id (add-lyra-type!))
+
+; For checking against your type.
+(define (my-type? m) (type-match? (lyra-type-id m) my-type-id))
+
+(define (my-type-to-s m) ...)
+
+; The new type uses a custom function for string-conversion and 
+; the build-in function for =.
+(add-type-basics! my-type-id my-type-to_s p=)
+
+; Define a replacement for the `map` function for your type.
+(define (my-type-map f m) ...)
+(add-type-function! my-type-id 'map my-type-map)
+
+; Creates a vector which carries the special id of your type
+(define (make-my-type) (pvector my-type-id))
+```
+
+## Next important TODO:
+
+- Use the new type-system in the following functions:
+
+```
+=
+<
+>
++
+-
+*
+/
+%
+&
+|
+bit-xor (p^)
+<<
+>>
+first
+second
+third
+fourth
+rest
+map
+filter
+append
+reverse
+->list
+->vector
+->hash-code
+foldl
+foldr
+int
+float
+nth
+get
 ```
 
 ## Missing features:

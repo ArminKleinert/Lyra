@@ -204,7 +204,6 @@ end
 # Sets up the core functions and variables. The functions defined here are
 # of the type NativeLyraFn instead of LyraFn. They can not make use of tail-
 # recursion and are supposed to be very simple.
-  BREAK_LOOP_OBJ = BasicObject.new
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
     entry = Cons.new(name, NativeLyraFn.new(name, false, min_args, max_args, &body))
@@ -247,7 +246,8 @@ def setup_core_functions
   add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
                                   first(args) }
   add_fn(:"vector-size", 1)    { |args, _| first(args).size }
-  add_fn(:"vector-iterate", 3) { |args, env| accumulator = second(args)
+  add_fn(:"vector-iterate", 3) { |args, env|
+                               accumulator = second(args)
                                f = third(args)
                                first(args).each_with_index do |e,i|
                                  accumulator = f.call(list(accumulator, e,i), env)
@@ -262,14 +262,14 @@ def setup_core_functions
       lti
     else
       case e
-      when nil          then 0b00000000
-      when Cons         then 0b00000001
-      when Integer      then 0b00000010
-      when Float        then 0b00000100
-      when true, false  then 0b00001000
-      when String       then 0b00010000
-      when Array        then 0b00100000
-      when Symbol       then 0b01000000
+      when nil          then 0
+      when Cons         then 1
+      when Integer      then 2
+      when Float        then 3
+      when true, false  then 4
+      when String       then 5
+      when Array        then 6
+      when Symbol       then 7
       else nil
       end
     end
@@ -647,8 +647,12 @@ end
 
 # Treat the first console argument as a filename,
 # read from the file and evaluate the result.
+begin
 evalstr(IO.read("core.lyra"))
 if ARGV.size > 0
   evalstr(IO.read(ARGV[0]))
 end
-
+rescue
+  $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s
+  raise
+end

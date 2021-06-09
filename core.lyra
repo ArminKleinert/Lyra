@@ -9,18 +9,46 @@
 (define import! load!)
 
 ;;;;;
-;;;;; SECTION Basic operations and operators
+;;;;; SECTION Important imports
 ;;;;;
 
-(define (null? e)   (= (lyra-type-id e) 0))
-(define (cons? e)   (bit-match? 0b00000001 (lyra-type-id e)))
-(define (int? e)    (bit-match? 0b00000010 (lyra-type-id e)))
-(define integer? int?)
-(define (float? e)  (bit-match? 0b00000100 (lyra-type-id e)))
-(define (bool? e)   (bit-match? 0b00001000 (lyra-type-id e)))
-(define (string? e) (bit-match? 0b00010000 (lyra-type-id e)))
-(define (vector? e) (bit-match? 0b00100000 (lyra-type-id e)))
-(define (symbol? e) (bit-match? 0b01000000 (lyra-type-id e)))
+(load! "type.lyra")
+
+;;;;;
+;;;;; SECTION Type definitions
+;;;;;
+
+(define nil-type    (add-lyra-type!))
+(define cons-type   (add-lyra-type!))
+(define int-type    (add-lyra-type!))
+(define float-type  (add-lyra-type!))
+(define bool-type   (add-lyra-type!))
+(define string-type (add-lyra-type!))
+(define vector-type (add-lyra-type!))
+(define symbol-type (add-lyra-type!))
+
+(define type-match? p=)
+(define (null? e)   (type-match? (lyra-type-id e) nil-type))
+(define (cons? e)   (type-match? (lyra-type-id e) cons-type))
+(define (int? e)    (type-match? (lyra-type-id e) int-type))
+(define (float? e)  (type-match? (lyra-type-id e) float-type))
+(define (bool? e)   (type-match? (lyra-type-id e) bool-type))
+(define (string? e) (type-match? (lyra-type-id e) string-type))
+(define (vector? e) (type-match? (lyra-type-id e) vector-type))
+(define (symbol? e) (type-match? (lyra-type-id e) symbol-type))
+
+(add-basics! nil-type    string p=)
+(add-basics! cons-type   string p=)
+(add-basics! int-type    string p=)
+;(add-basics! float-type  string p=)
+;(add-basics! bool-type   string p=)
+;(add-basics! string-type string p=)
+;(add-basics! vector-type string p=)
+;(add-basics! symbol-type string p=)
+
+;;;;;
+;;;;; SECTION Basic operations and operators
+;;;;;
 
 ; Boolean and
 (def-macro (and x y)
@@ -89,50 +117,11 @@
 ;;;;; SECTION String transformation
 ;;;;;
 
-(define LYRA-STRING-TRANSFORMERS (vector))
-
-(define (add-lyra-string-transformer! type-mask fn)
-  (vector-append! LYRA-STRING-TRANSFORMERS (cons type-mask fn)))
-
-; Try to find the first fitting transformation function in
-; LYRA-STRING-TRANSFORMERS using bit-match?. If non are found,
-; the primitive string function is returned.
-(define (get-lyra-string-transformer-by-type-id-fallback type-id)
-  (let* (iter (lambda (i)
-          (cond ((< i 0) string) ; Not found, fall back to native implementation.
-                ((bit-match? type-id (car (vector-get LYRA-STRING-TRANSFORMERS i)))
-                 (cdr (vector-get LYRA-STRING-TRANSFORMERS i)))
-                (#t (iter (dec i))))))
-    (iter (dec (vector-size LYRA-STRING-TRANSFORMERS)))))
-
-; Try to find the first fitting transformation function in 
-; LYRA-STRING-TRANSFORMERS using = on the type-id and the ids
-; of all the transformation-functions.
-(define (get-lyra-string-transformer-by-type-id type-id)
-  (let ((iter (lambda (i)
-          (cond ((= i (vector-size LYRA-STRING-TRANSFORMERS)) '())
-                ((= type-id (car (vector-get LYRA-STRING-TRANSFORMERS i)))
-                 (cdr (vector-get LYRA-STRING-TRANSFORMERS i)))
-                (#t (iter (inc i))))))
-        (transformer (iter 0)))
-    (if transformer
-      transformer
-      (get-lyra-string-transformer-by-type-id-fallback type-id))))
-
-(add-lyra-string-transformer! 0b00000000 (lambda (e) "")) ; Nil
-(add-lyra-string-transformer! 0b00000001 string) ; Cons
-(add-lyra-string-transformer! 0b00000010 string) ; Int
-(add-lyra-string-transformer! 0b00000100 string) ; Float
-(add-lyra-string-transformer! 0b00001000 (lambda (b) (if b "#t" "#f"))) ; Bool
-(add-lyra-string-transformer! 0b00010000 string) ; String
-(add-lyra-string-transformer! 0b00100000 string) ; Vector
-(add-lyra-string-transformer! 0b01000000 string) ; Symbol
-
 ; Finds the right string transformation function for the given element
 ; and tries to coonvert it to a string.
 (define (to-string e)
-  (let* (f (get-lyra-string-transformer-by-type-id (lyra-type-id e)))
-    (f e)))
+  (let* (f (get-type-function e 'to-string))
+    ((if f f string) e)))
 
 ;;;;;
 ;;;;; SECTION Simple IO
@@ -144,7 +133,7 @@
 
 ; Prints a string to stdout.
 (define (print! e)
-  (sprint! stdout (to-string e)))
+  (sprint! stdout e to-string))
 
 ; Prints a string to stdout followed by a new line.
 (define (println! e)
@@ -359,7 +348,6 @@
   (foldl (lambda (v x) (vector-append! v x))
          (vector) ls))
 
-; TODO with vector-iterate
 (define (vector->list v)
   (let* (iter (lambda (i nl)
           (if (< i 0)
@@ -367,6 +355,34 @@
             (iter (dec i)
               (cons (vector-get v i) nl)))))
     (iter (dec (vector-size v)) '())))
+
+;;; SUBSECT Searching lists and vectors by predicate
+
+(define (list-find-first f l)
+  (cond ((empty? l) '())
+        ((f (car l)) (car l))
+        (#t (list-find-first f (rest l)))))
+
+; Suboptimal: vector-iterate has no way to stop early.
+(define (vector-find-first f v)
+  (vector-iterate v '()
+    (lambda (res e i)
+      (cond ((not (null? res)) res)
+            ((f e) e)
+            #t res))))
+
+; Find first element which matches a predicate p
+(define (find-first p c)
+  (if (vector? c)
+    (vector-find-first p c)
+    (list-find-first p c)))
+
+(define (associated key c)
+  (let* (pair (find-first (lambda (e) (= (first e) key)) c))
+    (if pair (cdr pair) '())))
+
+(define (remove-associations key c)
+  (filter (lambda (e) (not= (first e) key)) c))
 
 ;;;;;
 ;;;;; SECTION: Interpreter hacking! Not safe for normal use!
@@ -454,6 +470,22 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
+(define (add e0 e1) (+ e0 e1))
+(println! (add 1 1))
+(println! (= 1 1))
+(println! (not (= 1 1)))
+(println! (not= 1 1))
+(println! "")
+(println! (= 2 1))
+(println! (not (= 2 1)))
+(println! (not= 2 1))
+(println! "")
+(println! (= 1 2))
+(println! (not (= 1 2)))
+(println! (not= 1 2))
+
+(comment
+
 (define (range n m acc)
   (if (> n m)
     acc
@@ -463,8 +495,6 @@
   (println! (measure 100 (lambda () (filter (lambda (e) (even? e)) v))))
   (let* (l (vector->list v))
     (println! (measure 100  (lambda () (filter (lambda (e) (even? e)) l))))))
-
-(comment
 
 (println! (reverse (list 1 2 3 4 5)))
 
@@ -514,20 +544,6 @@
 (println! (hash-code (vector 1 2 (cons 3 4))))
 (println! (hash-code (list 1 2 3)))
 (println! (hash-code (list 1 2 (cons 3 4))))
-
-(define (add e0 e1) (+ e0 e1))
-(println! (add 1 1))
-(println! (= 1 1))
-(println! (not (= 1 1)))
-(println! (not= 1 1))
-(println! "")
-(println! (= 2 1))
-(println! (not (= 2 1)))
-(println! (not= 2 1))
-(println! "")
-(println! (= 1 2))
-(println! (not (= 1 2)))
-(println! (not= 1 2))
 
 )
 

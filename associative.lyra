@@ -7,7 +7,7 @@
 
 (define MAP-NUM-BUCKETS 1024)
 
-(add-lyra-string-transformer! 0b10100000 (lambda (e) "MAP")) ; TODO
+;(add-lyra-string-transformer! 0b10100000 (lambda (e) "MAP")) ; TODO
 
 (define (map? m) (bit-match? 0b10000000 (lyra-type-id m)))
 
@@ -78,6 +78,8 @@
     (find-in-bucket bucket key)))
 
 
+(comment
+
 (let ((c (make-map))
       (v (vector)))
   (println! ((get-lyra-string-transformer-by-type-id (lyra-type-id c)) c))
@@ -93,7 +95,6 @@
   (println! (map? (vector)))
   )
 
-(comment
 (let ((m0 (make-map))
       (m1 (make-map)))
     (println! (map-to-string m0))

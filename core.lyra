@@ -336,14 +336,10 @@
     c1
     (cons (first c0) (append-list (rest c0) c1))))
 
-; TODO with vector-iterate
 ; Appends a vector to another.
 (define (vector-append-multi v0 v1)
-  (let* (iter (lambda (i nv)
-          (if (= i (vector-size v1))
-            nv
-            (iter (inc i) (vector-append! nv (vector-get v1 i))))))
-    (iter 0 (cpy-vector-range v0 0 (dec (vector-size v0))))))
+  (vector-iterate v1 (cpy-vector v0)
+    (lambda (acc e i) (vector-append! acc e))))
 
 (define (append c0 c1)
   (if (vector? c0)

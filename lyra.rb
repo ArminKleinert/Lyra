@@ -247,16 +247,12 @@ def setup_core_functions
   add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
                                   first(args) }
   add_fn(:"vector-size", 1)    { |args, _| first(args).size }
-  add_fn(:"vector-iterate", 3) { |args, env| r = nil
-                                 accumulator = second(args)
+  add_fn(:"vector-iterate", 3) { |args, env| accumulator = second(args)
                                f = third(args)
                                first(args).each_with_index do |e,i|
-                                 r = f.call(list(accumulator, e,i), env)
-                                 break if r.__id__ == BREAK_LOOP_OBJ.__id__
-                                 accumulator = r
+                                 accumulator = f.call(list(accumulator, e,i), env)
                                end
-                               r }
-  add_fn(:"break!",0)          { |_, _| BREAK_LOOP_OBJ }
+                               accumulator }
 
   # Returns an integer representing an arbitrary id for the type of the
   # argument. It can be check using (bit-match ..).

@@ -177,8 +177,9 @@ class LyraFn < Proc
         args = tailcall.args
         retry
       end
-    rescue RuntimeError
+    rescue
       $stderr.puts "#{@name} failed with error: #{$!}"
+      $stderr.puts "Arguments: #{args}"
       raise
     end
     
@@ -460,7 +461,7 @@ def evlambda(args_expr, body_expr, ismacro = false)
       # and maximum number of arguments.
       # -1 means infinite.
       max_args = -1
-      arg_count -= 1
+      arg_count -= 2
     end
   end
   
@@ -577,6 +578,13 @@ def eval_ly(expr, env, is_in_call_params=false)
         raise "quote takes exactly 1 argument"
       end
       second(expr)
+    when :requote
+      # Quotes a single expression so that it is not evaluated when
+      # passed.
+      if rest(expr).nil? || !(rest(rest(expr)).nil?)
+        raise "quote takes exactly 1 argument"
+      end
+      list(:quote, eval_ly(second(expr), env))
     when :"def-macro"
       # Same as define, but the 'ismacro' parameter is true.
       # Form: `(def-macro (name arg0 arg1 ...) body...)`
@@ -600,9 +608,16 @@ def eval_ly(expr, env, is_in_call_params=false)
       # inner cons must be executed too.
       func = eval_ly(func, env) if func.is_a?(Cons)
       
+      #if !func.is_a?(LyraFn)
+        # If func was a macro in `eval_ly(func, env)`, then
+        # the output, now written to func, might not be a function but
+        # an atom. In this this case, evaluate it again.
+        # TODO: Might this lead to bugs?
+        #func
       if func.ismacro
         # The macro is first called and the resulting expression
         # is then executed.
+        #puts func.call(args, env)
         eval_ly(func.call(args, env), env)
       else
         # Check whether a tailcall is possible
@@ -654,5 +669,6 @@ if ARGV.size > 0
 end
 rescue
   $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s
-  raise
+  $stderr.puts "Error: " + $!.message
+  #raise
 end

@@ -6,7 +6,8 @@
     new-id))
 
 (define (add-type-function! type-id sym fn)
-  (vector-append! (vector-get lyra-types type-id) (cons sym fn)))
+  (vector-append! (vector-get lyra-types type-id) (cons sym fn))
+  '())
 
 (define (get-type-function e sym)
   (vector-iterate (vector-get lyra-types (lyra-type-id e)) '()
@@ -14,6 +15,13 @@
       (cond ((not (null? res)) res)
             ((= (car p) sym) (cdr p))
             (#t '())))))
+
+(define (add-type-functions! type-id pairs)
+  (if (null? pairs)
+    '()
+    (begin
+      (add-type-function! type-id (car pairs) (cadr pairs))
+      (add-type-functions! type-id (cddr pairs)))))
 
 (define (add-basics! type-id string-fn =fn)
   (add-type-function! type-id 'to-string string-fn)

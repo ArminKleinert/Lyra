@@ -71,7 +71,7 @@
   )
 
 (define (atom? e)
-  (bit-match? 0b1011110 (lyra-type-id e)))
+  (and (not (null? e)) (not (cons? e))))
 
 (define (number? e)
   (or (int? e) (float? e)))
@@ -118,7 +118,7 @@
 ;;;;;
 
 ; Finds the right string transformation function for the given element
-; and tries to coonvert it to a string.
+; and tries to convert it to a string.
 (define (to-string e)
   (let* (f (get-type-function e 'to-string))
     ((if f f string) e)))
@@ -162,32 +162,6 @@
 
 ;;; SUBSECT: Accessors for sequences
 
-(define (first c) (if (vector? c) (vector-get c 0) (car c)))
-(define (second c) (if (vector? c) (vector-get c 1) (car (cdr c))))
-(define (ffirst c) (first (first c)))
-(define (sfirst c) (second (first c)))
-(define (rfirst c) (rest (first c)))
-(define (third c) (if (vector? c) (vector-get c 2) (car (cdr (cdr c)))))
-(define (fourth c) (if (vector? c) (vector-get c 3) (car (cdr (cdr (cdr c))))))
-(define (rest c) (if (vector? c) (cpy-vector-range c 1 (dec (vector-size c))) (cdr c)))
-
-; Get element by index (Cons)
-(define (list-nth xs index)
-  (if xs
-    (if (= index 0)
-      (car xs)
-      (list-nth (cdr xs) (- index 1)))
-    '()))
-
-; Get element by index (General)
-(define (nth xs index)
-  (if (vector? xs)
-    (vector-get xs index)
-    (list-nth xs index)))
-
-; at is an alias for nth
-(define at nth)
-
 ; car and cdr variants. Prefer first, second, ... if possible
 (define (caar x)    (car (car x)))
 (define (cadr x)    (car (cdr x)))
@@ -218,17 +192,14 @@
 (define (cdddar x)  (cdr (cdr (cdr (car x)))))
 (define (cddddr x)  (cdr (cdr (cdr (cdr x)))))
 
-; Length of a sequence
-(define (length c)
-  (cond ((vector? c) (vector-size c))
-        ((cons? c) (let* (addone (lambda (n m) (inc n)))
-                    (foldl addone 0 c)))
-        (#t 0)))
-
-;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
+(define (list-nth xs index)
+  (if xs
+    (if (= index 0)
+      (car xs)
+      (list-nth (cdr xs) (- index 1)))
+    '()))
 
 ; Fold left (Vector)
-
 (define (vfoldl f start v)
   (vector-iterate
     v start
@@ -239,6 +210,92 @@
   (if (empty? coll)
     start
     (cfoldl f (f start (first coll)) (rest coll))))
+
+(add-type-functions! cons-type
+  (list 'first car
+        'second cadr
+        'third caddr
+        'fourth cadddr
+        'rest cdr
+        'nth list-nth
+        'at list-nth
+        'length (lambda (c)
+                  (let* (addone (lambda (n m) (inc n)))
+                    (foldl addone 0 c)))
+        'foldl cfoldl))
+
+(add-type-functions! vector-type
+  (list 'first (lambda (c) (vector-get c 0))
+        'second (lambda (c) (vector-get c 1))
+        'third (lambda (c) (vector-get c 2))
+        'fourth (lambda (c) (vector-get c 3))
+        'rest (lambda (v) (cpy-vector-range v 1 (dec (vector-size v))))
+        'nth vector-get
+        'at vector-get
+        'length vector-size
+        'foldl vfoldl))
+
+; Appends a list to another.
+; The complexity depends on the length of the first list.
+(define (append-list c0 c1)
+  (if (null? c0)
+    c1
+    (cons (car c0) (append-list (cdr c0) c1))))
+
+(define (list-but-last c0)
+  (cond ((null? c0) '())
+        ((null? (cdr c0)) '())
+        (#t (cons (car c0) (list-but-last (cdr c0))))))
+
+(def-macro (apply f & args)
+  (cons
+    f
+    (cond ((null? args) '()) ((cons? args) args) (#t (list args)))))
+
+(comment
+                    (def-macro (define-method name type & args)
+                      (list 'define
+                        (append-list (list name type)
+                          (cond ((null? args) '()) ((cons? args) (list args)) (#t (list args))))
+                        (list 'apply (append-list (list 'get-type-function type) (list name))
+                          (if args (append-list (list type) (list args)) (list type)))))
+)
+
+(def-macro (define-method name type & args)
+  (list 'define
+    (append-list
+      (list name type)
+      (cond ((null? args) '()) ((cons? args) args) (#t (list args))))
+    (append-list
+      (list (list 'get-type-function type (requote name)))
+      (if args (append-list (list type) args) (list type)))))
+(define-method fff c)
+
+(define (first c) ((get-type-function c 'first) c))
+(define (second c) ((get-type-function c 'second) c))
+(define (ffirst c) (first (first c)))
+(define (sfirst c) (second (first c)))
+(define (rfirst c) (rest (first c)))
+(define (third c) ((get-type-function c 'third) c))
+(define (fourth c) ((get-type-function c 'fourth) c))
+(define (rest c) ((get-type-function c 'rest) c))
+
+; Get element by index (Cons)
+
+; Get element by index (General)
+;(define (nth xs index)
+ ; ((get-type-function xs 'nth) xs index))
+
+(define-method nth c index)
+
+(define (at xs key)
+  ((get-type-function xs 'at) xs key))
+
+; Length of a sequence
+(define (length c)
+  ((get-type-function c 'length) c))
+
+;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
 
 ; Fold left (General)
 (define (foldl f start coll)
@@ -318,12 +375,6 @@
 
 ;;; SUBSECT: Appending lists and vectors
 
-; Appends a list to another.
-; The complexity depends on the length of the first list.
-(define (append-list c0 c1)
-  (if (empty? c0)
-    c1
-    (cons (first c0) (append-list (rest c0) c1))))
 
 ; Appends a vector to another.
 (define (vector-append-multi v0 v1)
@@ -470,6 +521,19 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
+(add-type-function! cons-type 'fst (lambda (c) (car c)))
+(define-method fst c)
+
+(define-method abcdef type1 a b c d e f)
+
+(println! (append-list (list 1) (list 2)))
+(println! (list-but-last (list 1 2 3)))
+(println! (apply car ((list 1 2))))
+
+(println! "vvv fst vvv")
+(println! (fst (list 5 4 3)))
+(println! "^^^ fst ^^^")
+
 (define (add e0 e1) (+ e0 e1))
 (println! (add 1 1))
 (println! (= 1 1))
@@ -483,6 +547,12 @@
 (println! (= 1 2))
 (println! (not (= 1 2)))
 (println! (not= 1 2))
+
+(println! (ffirst (list (list (list 9 2) 2) 3 4)))
+(println! (ffirst (vector (vector (vector 99 6) 6) 7 8)))
+(println! (length (list (list 1 2) 3 4)))
+(println! (length (vector (vector 5 6) 7 8)))
+
 
 (comment
 

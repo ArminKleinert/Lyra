@@ -82,21 +82,6 @@
     (remove-from-map! m0 'a)
     (println! (get-value m0 'a)))
 
-(let ((c (make-map))
-      (v (vector)))
-  (println! ((get-lyra-string-transformer-by-type-id (lyra-type-id c)) c))
-  (println! (to-string c))
-  (println! c)
-  (println! (map? c))
-  (println! (lyra-type-id c))
-  (println! (vector? c))
-  (println! (list))
-  (println! (list 1 2))
-  (println! (pcons 4 5 1))
-  (println! (vector))
-  (println! (map? (vector)))
-  )
-
 )
 
 

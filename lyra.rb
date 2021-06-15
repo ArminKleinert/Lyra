@@ -306,12 +306,24 @@ def setup_core_functions
   add_fn(:time!, 0)            { |_, _| Time.now.to_f }
   add_fn(:"call-stack!", 0)    { |_, _| $lyra_call_stack }
 
+  # Runs a function n times, saves the millisecond time for each run
+  # and calculates the median time afterwards. The result is a floating point
+  # number.
   add_fn(:measure, 2)          { |args, env|
-                                  t = Time.now
-                                  first(args).times do |_|
-                                    second(args).call(nil, env)
-                                  end
-                                  Time.now - t }
+                                median = lambda do |arr|
+                                  arr.sort!
+                                  len = arr.size
+                                  (arr[(len-1)/2]+arr[len / 2]) / 2
+                                end
+                                
+                                res = []
+                                first(args).times do
+                                  t0 = Time.now
+                                  second(args).call(nil, env)
+                                  t1 = Time.now
+                                  res << (t1 - t0) * 1000.0
+                                end
+                                median.call(res) }
 
   add_fn(:"p-hash", 1)           { |args, _| first(args).hash }
 
@@ -452,7 +464,7 @@ def evlambda(args_expr, body_expr, ismacro = false)
     varargs = arg_arr[-2] == :"&"
     if varargs
       # Remove the `&` from the arguments.
-      last = arg_arr[-1] 
+      last = arg_arr[-1]
       arg_arr = arg_arr[0 .. -3]
       arg_arr << last
       args_expr = list(*arg_arr)
@@ -608,17 +620,11 @@ def eval_ly(expr, env, is_in_call_params=false)
       # inner cons must be executed too.
       func = eval_ly(func, env) if func.is_a?(Cons)
       
-      #if !func.is_a?(LyraFn)
-        # If func was a macro in `eval_ly(func, env)`, then
-        # the output, now written to func, might not be a function but
-        # an atom. In this this case, evaluate it again.
-        # TODO: Might this lead to bugs?
-        #func
       if func.ismacro
         # The macro is first called and the resulting expression
         # is then executed.
-        #puts func.call(args, env)
-        eval_ly(func.call(args, env), env)
+        r1 = func.call(args, env)
+        eval_ly(r1, env)
       else
         # Check whether a tailcall is possible
         # A tailcall is possible if the function is not natively implemented
@@ -663,10 +669,10 @@ end
 # Treat the first console argument as a filename,
 # read from the file and evaluate the result.
 begin
-evalstr(IO.read("core.lyra"))
-if ARGV.size > 0
-  evalstr(IO.read(ARGV[0]))
-end
+  evalstr(IO.read("core.lyra"))
+  if ARGV.size > 0
+    evalstr(IO.read(ARGV[0]))
+  end
 rescue
   $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s
   $stderr.puts "Error: " + $!.message

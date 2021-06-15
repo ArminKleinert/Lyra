@@ -40,11 +40,11 @@
 (add-basics! nil-type    string p=)
 (add-basics! cons-type   string p=)
 (add-basics! int-type    string p=)
-;(add-basics! float-type  string p=)
-;(add-basics! bool-type   string p=)
-;(add-basics! string-type string p=)
-;(add-basics! vector-type string p=)
-;(add-basics! symbol-type string p=)
+(add-basics! float-type  string p=)
+(add-basics! bool-type   string p=)
+(add-basics! string-type string p=)
+(add-basics! vector-type string p=)
+(add-basics! symbol-type string p=)
 
 ;;;;;
 ;;;;; SECTION Basic operations and operators
@@ -154,12 +154,6 @@
 
 (define nil '())
 
-; Check a sequence for emptyness
-(define (empty? l)
-  (if (vector? l)
-    (= (vector-size l) 0)
-    (or (atom? l) (null? l))))
-
 ;;; SUBSECT: Accessors for sequences
 
 ; car and cdr variants. Prefer first, second, ... if possible
@@ -192,6 +186,8 @@
 (define (cdddar x)  (cdr (cdr (cdr (car x)))))
 (define (cddddr x)  (cdr (cdr (cdr (cdr x)))))
 
+(define (list-empty? l) (or (atom? l) (null? l)))
+
 (define (list-nth xs index)
   (if xs
     (if (= index 0)
@@ -207,9 +203,63 @@
 
 ; Fold left (Cons)
 (define (cfoldl f start coll)
-  (if (empty? coll)
+  (if (list-empty? coll)
     start
     (cfoldl f (f start (first coll)) (rest coll))))
+
+; map for vectors
+(define (map-vector f v)
+  (vector-iterate
+    v (cleared-vector v)
+    (lambda (acc e i) (vector-append! acc (f e)))))
+
+; map for conses
+(define (map-list f xs)
+  (if (list-empty? xs)
+    '()
+    (cons (f (car xs)) (map f (cdr xs)))))
+
+(define (filter-vector f v)
+  (vector-iterate v (cleared-vector v)
+    (lambda (acc e i) (if (f e) (vector-append! acc e) acc))))
+    
+(define (filter-list f xs)
+  (if (list-empty? xs)
+    '()
+    (if (f (car xs))
+      (cons (car xs) (filter-list f (cdr xs)))
+      (filter-list f (cdr xs)))))
+
+; Appends a vector to another.
+(define (vector-append-multi v0 v1)
+  (vector-iterate v1 (cpy-vector v0)
+    (lambda (acc e i) (vector-append! acc e))))
+
+; Appends a list to another.
+; The complexity depends on the length of the first list.
+(define (append-list c0 c1)
+  (if (null? c0)
+    c1
+    (cons (car c0) (append-list (cdr c0) c1))))
+
+;;; SUBSECT Searching lists and vectors by predicate
+
+(define (list-find-first f l)
+  (cond ((empty? l) '())
+        ((f (car l)) (car l))
+        (#t (list-find-first f (rest l)))))
+
+; Suboptimal: vector-iterate has no way to stop early.
+(define (vector-find-first f v)
+  (vector-iterate v '()
+    (lambda (res e i)
+      (cond ((not (null? res)) res)
+            ((f e) e)
+            #t res))))
+            
+;;;;;
+;;;;; SECTION: Defining types with functions.
+;;;;;
 
 (add-type-functions! cons-type
   (list 'first car
@@ -222,7 +272,12 @@
         'length (lambda (c)
                   (let* (addone (lambda (n m) (inc n)))
                     (foldl addone 0 c)))
-        'foldl cfoldl))
+        'foldl cfoldl
+        'map map-list
+        'filter filter-list
+        'append append-list
+        'empty? list-empty?
+        'find-first list-find-first))
 
 (add-type-functions! vector-type
   (list 'first (lambda (c) (vector-get c 0))
@@ -233,43 +288,36 @@
         'nth vector-get
         'at vector-get
         'length vector-size
-        'foldl vfoldl))
-
-; Appends a list to another.
-; The complexity depends on the length of the first list.
-(define (append-list c0 c1)
-  (if (null? c0)
-    c1
-    (cons (car c0) (append-list (cdr c0) c1))))
+        'foldl vfoldl
+        'map map-vector
+        'filter filter-vector
+        'append vector-append-multi
+        'empty? (lambda (c) (= (vector-size c) 0))
+        'find-first vector-find-first))
 
 (define (list-but-last c0)
   (cond ((null? c0) '())
         ((null? (cdr c0)) '())
         (#t (cons (car c0) (list-but-last (cdr c0))))))
 
+; FIXME
 (def-macro (apply f & args)
   (cons
     f
     (cond ((null? args) '()) ((cons? args) args) (#t (list args)))))
 
-(comment
-                    (def-macro (define-method name type & args)
-                      (list 'define
-                        (append-list (list name type)
-                          (cond ((null? args) '()) ((cons? args) (list args)) (#t (list args))))
-                        (list 'apply (append-list (list 'get-type-function type) (list name))
-                          (if args (append-list (list type) (list args)) (list type)))))
-)
-
-(def-macro (define-method name type & args)
+(def-macro (define-method name type args)
   (list 'define
     (append-list
       (list name type)
-      (cond ((null? args) '()) ((cons? args) args) (#t (list args))))
+      (cond ((null? args) '())
+            ((cons? args) args)
+            (#t (list args))))
     (append-list
       (list (list 'get-type-function type (requote name)))
-      (if args (append-list (list type) args) (list type)))))
-(define-method fff c)
+      (if args
+        (append-list (list type) args)
+        (list type)))))
 
 (define (first c) ((get-type-function c 'first) c))
 (define (second c) ((get-type-function c 'second) c))
@@ -283,53 +331,39 @@
 ; Get element by index (Cons)
 
 ; Get element by index (General)
-;(define (nth xs index)
- ; ((get-type-function xs 'nth) xs index))
-
-(define-method nth c index)
+(define (nth xs index)
+  ((get-type-function xs 'nth) xs index))
 
 (define (at xs key)
   ((get-type-function xs 'at) xs key))
 
 ; Length of a sequence
-(define (length c)
-  ((get-type-function c 'length) c))
+(define-method length c '())
+
+; Check a sequence for emptyness
+(define-method empty? l '())
 
 ;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
 
 ; Fold left (General)
 (define (foldl f start coll)
-  (if (vector? coll) (vfoldl f start coll) (cfoldl f start coll)))
+  ((get-type-function coll 'foldl) f start coll))
 
 ; Reduce is just an alias for foldl.
 (define reduce foldl)
 
 ; Fold right
 (define (foldr f start coll)
-  (if (empty? coll)
+  (if (list-empty? coll)
     start
     (f (first coll) (foldr f start (rest coll)))))
 
 ;;; SUBSECT: Map (apply a function on each element)
 
-; map for vectors
-(define (map-vector f v)
-  (vector-iterate
-    v (cleared-vector v)
-    (lambda (acc e i) (vector-append! acc (f e)))))
-
-; map for conses
-(define (map-list f xs)
-  (if (empty? xs)
-    '()
-    (cons (f (car xs)) (map f (cdr xs)))))
-
 ; Executes a function f on each element of a list xs
 ; and returns a new list.
 (define (map f xs)
-  (if (vector? xs)
-    (map-vector f xs)
-    (map-list f xs)))
+  ((get-type-function xs 'map) f xs))
 
 ; Like map for conses, but works in place.
 (define (map! f xs)
@@ -341,19 +375,8 @@
 
 ;;; SUBSECT: Filter a list xs by a predicate f.
 
-(define (filter-vector f v)
-  (vector-iterate v (cleared-vector v)
-    (lambda (acc e i) (if (f e) (vector-append! acc e) acc))))
-    
-(define (filter-list f xs)
-  (if (empty? xs)
-    '()
-    (if (f (car xs))
-      (cons (car xs) (filter f (cdr xs)))
-      (filter-list f (cdr xs)))))
-
 (define (filter f xs)
-  (if (vector? xs) (filter-vector f xs) (filter-list f xs)))
+  ((get-type-function xs 'filter) f xs))
 
 ;;; SUBSECT: Copying
 
@@ -375,16 +398,8 @@
 
 ;;; SUBSECT: Appending lists and vectors
 
-
-; Appends a vector to another.
-(define (vector-append-multi v0 v1)
-  (vector-iterate v1 (cpy-vector v0)
-    (lambda (acc e i) (vector-append! acc e))))
-
 (define (append c0 c1)
-  (if (vector? c0)
-    (vector-append-multi c0 c1)
-    (append-list c0 c1)))
+  ((get-type-function c0 'append) c0 c1))
     
 ;;; SUBSECT reversal
     
@@ -407,26 +422,9 @@
               (cons (vector-get v i) nl)))))
     (iter (dec (vector-size v)) '())))
 
-;;; SUBSECT Searching lists and vectors by predicate
-
-(define (list-find-first f l)
-  (cond ((empty? l) '())
-        ((f (car l)) (car l))
-        (#t (list-find-first f (rest l)))))
-
-; Suboptimal: vector-iterate has no way to stop early.
-(define (vector-find-first f v)
-  (vector-iterate v '()
-    (lambda (res e i)
-      (cond ((not (null? res)) res)
-            ((f e) e)
-            #t res))))
-
 ; Find first element which matches a predicate p
 (define (find-first p c)
-  (if (vector? c)
-    (vector-find-first p c)
-    (list-find-first p c)))
+  ((get-type-function c 'find-first) p c))
 
 (define (associated key c)
   (let* (pair (find-first (lambda (e) (= (first e) key)) c))
@@ -522,17 +520,42 @@
 ;;;;;
 
 (add-type-function! cons-type 'fst (lambda (c) (car c)))
-(define-method fst c)
+(define-method fst c '())
 
-(define-method abcdef type1 a b c d e f)
+(define-method abcdef type1 (a b c d e f))
 
-(println! (append-list (list 1) (list 2)))
+(println! (append-list (list 1) (list 2 3)))
 (println! (list-but-last (list 1 2 3)))
-(println! (apply car ((list 1 2))))
 
-(println! "vvv fst vvv")
-(println! (fst (list 5 4 3)))
-(println! "^^^ fst ^^^")
+(println! (fst (list 6 5 4 3)))
+
+(println! (ffirst (list (list (list 9 2) 2) 3 4)))
+(println! (ffirst (vector (vector (vector 99 6) 6) 7 8)))
+(println! (ffirst (vector (list 6) 7 8)))
+(println! (length (list (list 1 2) 3 4)))
+(println! (length (vector (vector 5 6) 7 8)))
+
+(println! (foldl + 0 (list 1 2 3 4 5)))
+(println! (foldl + 0 (vector 1 2 3 4 5)))
+
+(define (range n m acc)
+  (if (> n m)
+    acc
+    (range (inc n) m (vector-append! acc n))))
+
+(let ((v (range 0 99 (vector)))
+      (l (vector->list v))
+      (predicate (lambda (e) (even? e)))
+      (nruns 100))
+  (println! (filter predicate v))
+  (println! (filter predicate l))
+  (println! (measure nruns (lambda () (filter predicate v))))
+  (println! (measure nruns (lambda () (filter predicate l))))
+  (println! (measure nruns (lambda () (filter-vector predicate v))))
+  (println! (measure nruns (lambda () (filter-list predicate l)))))
+
+; Test written to measure lookup time for methods...
+(comment
 
 (define (add e0 e1) (+ e0 e1))
 (println! (add 1 1))
@@ -547,24 +570,6 @@
 (println! (= 1 2))
 (println! (not (= 1 2)))
 (println! (not= 1 2))
-
-(println! (ffirst (list (list (list 9 2) 2) 3 4)))
-(println! (ffirst (vector (vector (vector 99 6) 6) 7 8)))
-(println! (length (list (list 1 2) 3 4)))
-(println! (length (vector (vector 5 6) 7 8)))
-
-
-(comment
-
-(define (range n m acc)
-  (if (> n m)
-    acc
-    (range (inc n) m (vector-append! acc n))))
-
-(let* (v (range 0 100 (vector)))
-  (println! (measure 100 (lambda () (filter (lambda (e) (even? e)) v))))
-  (let* (l (vector->list v))
-    (println! (measure 100  (lambda () (filter (lambda (e) (even? e)) l))))))
 
 (println! (reverse (list 1 2 3 4 5)))
 

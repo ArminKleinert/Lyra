@@ -7,14 +7,21 @@
 
 (define (add-type-function! type-id sym fn)
   (vector-append! (vector-get lyra-types type-id) (cons sym fn))
-  '())
+  sym)
 
 (define (get-type-function e sym)
-  (vector-iterate (vector-get lyra-types (lyra-type-id e)) '()
-    (lambda (res p i)
-      (cond ((not (null? res)) res)
-            ((= (car p) sym) (cdr p))
-            (#t '())))))
+  (let* (func 
+      (vector-iterate (vector-get lyra-types (lyra-type-id e)) '()
+      (lambda (res p i)
+        (cond ((not (null? res)) res) ; Already found
+              ((= (car p) sym) (cdr p)) ; Found
+              (#t '())))))
+    (if (null? func)
+      (sprintln! stderr
+        (+ (+ (+ "No function " (string sym)) " for type ")
+          (string (lyra-type-id e))))
+      '())
+    func))
 
 (define (add-type-functions! type-id pairs)
   (if (null? pairs)
@@ -26,8 +33,12 @@
 (define (add-basics! type-id string-fn =fn)
   (add-type-function! type-id 'to-string string-fn)
   (add-type-function! type-id '= =fn))
-
-
+  
+(define (copy-type-functions! from-type-id to-type-id)
+  (let ((v-from (vector-get lyra-types from-type-id))
+        (v-to   (vector-get lyra-types to-type-id)))
+    (vector-iterate v-from v-to
+      (lambda (acc e i) (vector-append! acc e)))))
 
 
 

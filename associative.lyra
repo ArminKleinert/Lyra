@@ -64,9 +64,7 @@
         (bucket (select-bucket m code)))
     (find-in-bucket bucket key)))
 
-    
 (comment
-
 (let ((m0 (make-map))
       (m1 (make-map)))
     (println! (map-to-string m0))
@@ -81,7 +79,6 @@
     (println! (get-value m0 'a))
     (remove-from-map! m0 'a)
     (println! (get-value m0 'a)))
-
 )
 
 

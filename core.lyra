@@ -140,6 +140,11 @@
   (sprint! stdout e to-string)
   (sprint! stdout "\n"))
 
+; Prints a string to stdout followed by a new line.
+(define (sprintln! stream e)
+  (sprint! stream e to-string)
+  (sprint! stream "\n"))
+
 ; Prints the elements of a list, separated by newlines.
 (define (printall! cs)
   (if (empty? cs)
@@ -256,7 +261,7 @@
       (cond ((not (null? res)) res)
             ((f e) e)
             #t res))))
-            
+
 ;;;;;
 ;;;;; SECTION: Defining types with functions.
 ;;;;;
@@ -278,6 +283,8 @@
         'append append-list
         'empty? list-empty?
         'find-first list-find-first))
+
+(copy-type-functions! cons-type nil-type)
 
 (add-type-functions! vector-type
   (list 'first (lambda (c) (vector-get c 0))
@@ -427,8 +434,10 @@
   ((get-type-function c 'find-first) p c))
 
 (define (associated key c)
-  (let* (pair (find-first (lambda (e) (= (first e) key)) c))
-    (if pair (cdr pair) '())))
+  (if (empty? c)
+    '()
+    (let* (pair (find-first (lambda (e) (= (first e) key)) c))
+      (if pair (cdr pair) '()))))
 
 (define (remove-associations key c)
   (filter (lambda (e) (not= (first e) key)) c))
@@ -519,6 +528,8 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
+(comment
+
 (add-type-function! cons-type 'fst (lambda (c) (car c)))
 (define-method fst c '())
 
@@ -555,7 +566,6 @@
   (println! (measure nruns (lambda () (filter-list predicate l)))))
 
 ; Test written to measure lookup time for methods...
-(comment
 
 (define (add e0 e1) (+ e0 e1))
 (println! (add 1 1))

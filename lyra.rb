@@ -670,8 +670,8 @@ end
 # read from the file and evaluate the result.
 begin
   evalstr(IO.read("core.lyra"))
-  if ARGV.size > 0
-    evalstr(IO.read(ARGV[0]))
+  ARGV.each do |f|
+    evalstr(IO.read(f))
   end
 rescue
   $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s

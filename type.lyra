@@ -15,10 +15,10 @@
       (lambda (res p i)
         (cond ((not (null? res)) res) ; Already found
               ((= (car p) sym) (cdr p)) ; Found
-              (#t '())))))
+              (#t '()))))) ; Next
     (if (null? func)
       (sprintln! stderr
-        (+ (+ (+ "No function " (string sym)) " for type ")
+        (+ (+ (+ "INTERNAL ERROR: No function " (string sym)) " for type ")
           (string (lyra-type-id e))))
       '())
     func))

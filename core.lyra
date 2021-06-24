@@ -528,9 +528,11 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
+(println! (empty? '()))
+
 (comment
 
-(add-type-function! cons-type 'fst (lambda (c) (car c)))
+(add-type-function!` cons-type 'fst (lambda (c) (car c)))
 (define-method fst c '())
 
 (define-method abcdef type1 (a b c d e f))

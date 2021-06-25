@@ -21,10 +21,6 @@ Cons = Struct.new(:car, :cdr) do
     "(" + list_to_s_helper() + ")"
   end
   
-  def inspect
-    to_s
-  end
-  
   # Not necessary, just for ease of use.
   def to_a
     rest = cdr
@@ -43,95 +39,6 @@ class Array
   end
   def lyra_type_id=(liti)
     @lyra_type_id = liti
-  end
-end
-
-class LyraEnv
-  NOT_FOUND = BasicObject.new
-  
-  def initialize(parent, inner = Hash.new(NOT_FOUND))
-    @inner = inner
-    @parent = parent
-  end
-  
-  def find(sym)
-    v = @inner[sym]
-    if v != NOT_FOUND
-      v
-    else
-      raise "Symbol not found: #{x}" if @parent.nil?
-      @parent.find(sym)
-    end
-  end
-  
-  def add(sym, v)
-    @inner[sym] = v
-    self
-  end
-  
-  def has_key?(sym)
-    v = @inner[sym]
-    if v != NOT_FOUND
-      true
-    else
-      return false if @parent.nil?
-      @parent.has_key[sym]
-    end
-  end
-  
-  def add_pairs(pairs)
-    pairs.each do |p|
-      add(p.car, p.cdr)
-    end
-    self
-  end
-  
-  def clone
-    LyraEnv.new(@parent, @inner.clone)
-  end
-  
-  def to_s
-    "{variables: #{@inner.to_s}; parent: #{@parent.to_s}}"
-  end
-  
-  def size
-    @inner.size + (@parent.nil? ? 0 : @parent.size)
-  end
-end
-
-class LyraEnvPair
-  def initialize(e0, e1)
-    @e0 = e0.clone
-    @e1 = e1
-  end
-  
-  def find(sym)
-    begin
-      @e0.find(sym)
-    rescue
-      @e1.find(sym)
-    end
-  end
-  
-  def add(sym, v)
-    @e0.add sym, v
-  end
-  
-  def has_key?(sym)
-    @e0.has_key?(sym) || @e1.has_key?(sym)
-  end
-  
-  def add_pairs(pairs)
-    @e0.add_pairs(pairs)
-    self
-  end
-  
-  def to_s
-    "{parent0: #{@e0.to_s}; parent1: #{@e1.to_s}}"
-  end
-  
-  def size
-    @e0.size + @e1.size
   end
 end
 
@@ -300,10 +207,11 @@ end
 # recursion and are supposed to be very simple.
 def setup_core_functions
   def add_fn(name, min_args, max_args=min_args, &body)
-    LYRA_ENV.add(name, NativeLyraFn.new(name, false, min_args, max_args, &body))
+    entry = Cons.new(name, NativeLyraFn.new(name, false, min_args, max_args, &body))
+    LYRA_ENV.cdr = Cons.new(entry, LYRA_ENV.cdr)
   end
   def add_var(name, value)
-    LYRA_ENV.add(name, value)
+    LYRA_ENV.cdr = Cons.new(Cons.new(name, value), LYRA_ENV.cdr)
   end
 
   # "Primitive" operators. They are overridden in the core library of
@@ -395,6 +303,7 @@ def setup_core_functions
   add_fn(:parse, 1)            { |args, env| s = first(args)
                                   make_ast(tokenize(s)) }
 
+  add_fn(:"global-env!", 0)    { |_, _| LYRA_ENV.cdr }
   add_fn(:time!, 0)            { |_, _| Time.now.to_f }
   add_fn(:"call-stack!", 0)    { |_, _| $lyra_call_stack }
 
@@ -407,15 +316,15 @@ def setup_core_functions
                                   len = arr.size
                                   (arr[(len-1)/2]+arr[len / 2]) / 2
                                 end
-
+                                
                                 res = []
                                 first(args).times do
                                   t0 = Time.now
                                   second(args).call(nil, env)
                                   t1 = Time.now
-                                  #puts "#{LYRA_ENV.size} #{env.size}"
                                   res << (t1 - t0) * 1000.0
                                 end
+                                puts res.inspect if res.size > 5
                                 median.call(res) }
 
   add_fn(:"p-hash", 1)           { |args, _| first(args).hash }
@@ -430,7 +339,7 @@ end
 # nil is not a valid pair but will be used as a separator between
 # local LYRA_ENV and global LYRA_ENV.
 unless Object.const_defined?(:LYRA_ENV)
-  LYRA_ENV = LyraEnv.new(nil)
+  LYRA_ENV = Cons.new(nil,nil)
   $lyra_call_stack = nil # Also handled as a cons
   setup_core_functions()
 end
@@ -450,24 +359,31 @@ end
 # The intended use for this function is for adding function arguments
 # to the environment. The latter case makes it easy to pass
 # variadic arguments.
-def pairs(cons0, cons1, res = [])
+def pairs(cons0, cons1)
   if cons0.nil?
-    res
+    nil
   elsif cons1.nil?
-    res << Cons.new(first(cons0), nil)
-    pairs(cons0.cdr, nil, res)
+    # FIXME
+    Cons.new(Cons.new(first(cons0), nil), pairs(cons0.cdr, nil))
   elsif cons0.cdr.nil? && !(cons1.cdr.nil?)
-    res << Cons.new(first(cons0), cons1)
-    res
+    Cons.new(Cons.new(first(cons0), cons1), nil)
   else
-    res << Cons.new(first(cons0), first(cons1))
-    pairs(cons0.cdr, cons1.cdr, res)
+    Cons.new(Cons.new(first(cons0), first(cons1)), pairs(cons0.cdr, cons1.cdr))
   end
 end
 
 # Search environment for symbol
 def associated(x, env)
-  env.find(x)
+  if env.nil?
+    raise "Symbol not found: #{x}"
+  elsif env.car.nil?
+    # Divider between local and global environments
+    associated(x, env.cdr)
+  elsif env.car.car == x
+    env.car.cdr
+  else
+    associated(x, env.cdr)
+  end
 end
 
 # Append two lists. Complexity depends on the first list.
@@ -527,9 +443,11 @@ def evdefine(expr, env, ismacro)
     val = second(expr)
     res = eval_ly(val, env) # Get and evaluate the value.
   end
-
+  # Create an entry with the name and value.
+  entry = Cons.new(name, res)
+  
   # Add the entry to the global environment.
-  LYRA_ENV.add(name, res)
+  LYRA_ENV.cdr = Cons.new(entry , LYRA_ENV.cdr)
   
   name
 end
@@ -564,12 +482,8 @@ def evlambda(args_expr, body_expr, definition_env, ismacro = false)
   LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
     # Makes pairs of the argument names and given arguments and
     # adds these pairs to the local environment.
-    env1 = nil
-    if definition_env.__id__ == LYRA_ENV.__id__
-      env1 = LyraEnv.new(LYRA_ENV).add_pairs(pairs(args_expr, args))
-    else 
-      env1 = LyraEnvPair.new(definition_env, environment).add_pairs(pairs(args_expr, args))
-    end
+    env1 = append(append(pairs(args_expr, args), definition_env), environment)
+    #env1 = append(pairs(args_expr, args), definition_env, environment))
     # Execute all commands in the body and return the last
     # value.
     eval_keep_last(body_expr, env1)
@@ -647,8 +561,7 @@ def eval_ly(expr, env, is_in_call_params=false)
       # If the body is empty, returns nil.
       name = first(second(expr))
       val = eval_ly(second(second(expr)), env) # Evaluate the value.
-      env1 = LyraEnv.new(env)
-      env1.add(name, val) # Add the value to the environment.
+      env1 = Cons.new(Cons.new(name, val), env) # Add the value to the environment.
       eval_keep_last(rest(rest(expr)), env1) # Evaluate the body.
     when :let
       raise "let needs at least 1 argument." if expr.cdr.nil?
@@ -661,13 +574,13 @@ def eval_ly(expr, env, is_in_call_params=false)
 
       bindings = second(expr)
       body = rest(rest(expr))
-      env1 = LyraEnv.new(env)
+      env1 = env
 
       # Evaluate and add the bindings in order (so they will end up in the
       # environment in reverse order since they are each appended to the
       # beginning).
       while bindings
-        env1.add(bindings.car.car, eval_ly(bindings.car.cdr.car, env1))
+        env1 = Cons.new(Cons.new(bindings.car.car, eval_ly(bindings.car.cdr.car, env1)), env1)
         bindings = bindings.cdr
       end
       
@@ -778,6 +691,5 @@ begin
 rescue
   $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s
   $stderr.puts "Error: " + $!.message
-  $stderr.puts LYRA_ENV.to_s
   #raise
 end

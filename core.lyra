@@ -335,12 +335,6 @@
         ((null? (cdr c0)) '())
         (#t (cons (car c0) (list-but-last (cdr c0))))))
 
-; FIXME
-(def-macro (apply f & args)
-  (cons
-    f
-    (cond ((null? args) '()) ((cons? args) args) (#t (list args)))))
-
 (def-macro (define-method name type args)
   (list 'define
     (append-list
@@ -471,53 +465,6 @@
   (filter (lambda (e) (not= (first e) key)) c))
 
 ;;;;;
-;;;;; SECTION: Interpreter hacking! Not safe for normal use!
-;;;;;
-
-; Do not call directly. This should only be called by deprioritise!.
-(define (deprioritise-helper! env sym val found)
-  (if (empty? env)
-    '()
-    (if (empty? (cdr env))
-      (if found
-        (if (= (car (car env)) sym)
-          (set-cdr! (car env) val)
-          (set-cdr! env (list (cons sym val))))
-        '())
-      (if (= (car (car env)) sym)
-        (if found
-          (begin
-            (set-car! (car env) (car (cdr env)))
-            (set-cdr! (car env) (cdr (cdr env))))
-          (let* (v (cdr (car env)))
-            (set-car! env (car (cdr env)))
-            (set-cdr! env (cdr (cdr env)))
-            (deprioritise-helper! (cdr env) sym v #t)))
-        (deprioritise-helper! (cdr env) sym val found)))))
-
-; Find symbol in global env and move it to the end
-; Example:
-;   (define nothing '())
-;   (println! (index-in-env! 'nothing)) => 0
-;   (deprioritise! 'nothing)
-;   (println! (index-in-env! 'nothing)) => 86
-(define (deprioritise! sym)
-  (deprioritise-helper! (global-env!) sym '() #f))
-
-(define (index-in-env-helper! sym env i)
-  (if (empty? env)
-    -1
-    (if (= (car (car env)) sym)
-      i
-      (index-in-env-helper! sym (cdr env) (inc i)))))
-
-; Find the index of a symbol in the global environment.
-; Indexing starts at 0. If the symbol could not be found,
-; -1 is returned.
-(define (index-in-env! sym)
-  (index-in-env-helper! sym (global-env!) 0))
-
-;;;;;
 ;;;;; SECTION: Utilities
 ;;;;;
 
@@ -556,13 +503,21 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
-(println! (measure 10
-(lambda ()
-(let* (println! (lambda (x) #t))
+(define (range n m acc)
+  (if (> n m)
+    acc
+    (range (inc n) m (vector-append! acc n))))
 (add-type-function! cons-type 'fst (lambda (c) (car c)))
 (define-method fst c '())
 
 (define-method abcdef type1 (a b c d e f))
+(define (add e0 e1) (+ e0 e1))
+
+;(println! (measure 100 (lambda () (range 0 6000 (vector)))))
+
+(comment println! (measure 127
+(lambda ()
+(let* (println! (lambda (x) #t))
 
 (println! (append-list (list 1) (list 2 3)))
 (println! (list-but-last (list 1 2 3)))
@@ -578,11 +533,6 @@
 (println! (foldl + 0 (list 1 2 3 4 5)))
 (println! (foldl + 0 (vector 1 2 3 4 5)))
 
-(define (range n m acc)
-  (if (> n m)
-    acc
-    (range (inc n) m (vector-append! acc n))))
-
 (let ((v (range 0 99 (vector)))
       (l (vector->list v))
       (predicate (lambda (e) (even? e)))
@@ -596,7 +546,6 @@
 
 ; Test written to measure lookup time for methods...
 
-(define (add e0 e1) (+ e0 e1))
 (println! (add 1 1))
 (println! (= 1 1))
 (println! (not (= 1 1)))

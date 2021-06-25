@@ -2,6 +2,8 @@
 
 Lyra is a lisp I make for fun and learning.
 
+Current verssion: 0.8.1
+
 ## Goals and priorities:
 
 - The top goal is to finish something simple. The project will be slowly iterated upon.  
@@ -181,9 +183,9 @@ nil      | Alias for '().
 
 ## User defined types:
 
-- Call `add-lyra-type!` and save the value somewhere (`(define my-type-id (add-lyra-type!))`)
-- Create a `<type>?` function. (`(define (my-type? m) (type-match? (lyra-type-id m) my-type-id))`)
-- Call `add-type-basics!`. The function takes 3 arguments: 1 for string-conversion and 1 for equality-checks. Primitive variants `string` and `p=` can be used.
+- Call `add-lyra-type!` and save the value somewhere (`(define my-type-id (add-lyra-type!))`)  
+- Create a `<type>?` function. (`(define (my-type? m) (type-match? (lyra-type-id m) my-type-id))`)  
+- Call `add-type-basics!`. The function takes 3 arguments: 1 for string-conversion and 1 for equality-checks. Primitive variants `string` and `p=` can be used.  
 - You can add more functions with `add-type-function!`
 
 ```
@@ -225,34 +227,30 @@ nil      | Alias for '().
 bit-xor (p^)
 <<
 >>
-first
-second
-third
-fourth
-rest
-map
-filter
-append
 reverse
 ->list
 ->vector
-->hash-code
-foldl
-foldr
+hash-code
 int
 float
-nth
-get
 ```
 
 ## Missing features:
 
 Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.  
 
-"Curried" lambdas like the following: `(lambda (n) (lambda (m) (+ n m)))`  
-This will fail because `n` won't be found when the inner lambda is called. The same happens with lambdas inside a `let*`.  
-
 A module-system to prevent messing with core-function-names. (Can easily happen when using `define`)  
+
+## Changelog:
+
+0.1.0 The thing works.  
+0.2.0 Added macros and basic functions including fold, map, filter, etc.  
+0.3.0 Added vectors.  
+0.4.0 Added more numeric literals and cond.  
+0.5.0 Many bugfixes and maps.  
+0.6.0 Added user-defined types.  
+0.7.0 Nil is now compatible with conses.  
+0.8.0 Massive performance improvements by making the environment a map instead of a cons.  
 
 ## Videos:
 

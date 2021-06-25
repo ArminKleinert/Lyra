@@ -102,13 +102,19 @@
 (define << p<<)
 (define >> p>>)
 
-(comment
 (define (= n & ns)
-  (cfoldl (lambda (x y) (and x (p= n y))) #t ns))
+  (cond ((null? ns) #t)
+        ((null? (cdr ns)) (p= n (car ns)))
+        (#t (cfoldl (lambda (x y) (and x (p= n y))) #t ns))))
 (define (+ n & ns)
-  (cfoldl (lambda (x y) (p+ x y)) n ns))
+  (if (empty? (cdr ns))
+    (p+ n (car ns))
+    (cfoldl (lambda (x y) (p+ x y)) n ns)))
 (define (- n & ns)
-  (cfoldl (lambda (x y) (p- x y)) 0 (cons n ns)))
+  (if (empty? ns)
+    (p- 0 n)
+    (cfoldl (lambda (x y) (p- x y)) n ns)))
+
 (define (* n & ns)
   (cfoldl (lambda (x y) (p* x y)) n ns))
 (define (/ n & ns)
@@ -125,7 +131,6 @@
   (cfoldl (lambda (x y) (p<< x y)) n ns))
 (define (>> n & ns)
   (cfoldl (lambda (x y) (p<< x y)) n ns))
-)
 
 (define (<= x y) (or (< x y) (= x y)))
 (define (>= x y) (or (> x y) (= x y)))
@@ -512,6 +517,19 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
+
+(comment
+(println! (= 1))
+(println! (= 1 1))
+(println! (= 1 1 1 1))
+(println! (= 1 2 3 4 5 6))
+(println! (+ 1 2))
+(println! (- 1 2 3 4 5 6))
+(println! (- 1))
+(println! (* 1 2 3 4 5 6))
+(println! (/ 1 2 3 4 5 6))
+(println! (% 1 2 3 4 5 6))
+
 (define (range n m acc)
   (if (> n m)
     acc
@@ -522,10 +540,7 @@
 (define-method abcdef type1 (a b c d e f))
 (define (add e0 e1) (+ e0 e1))
 
-;(println! (measure 100 (lambda () (range 0 6000 (vector)))))
-
-
-(comment println! (measure 127
+(println! (measure 127
 (lambda ()
 (println! (copy     (list 1 2 3 4)))
 (println! (->vector (list 1 2 3 4)))
@@ -625,9 +640,5 @@
 (println! (hash-code (list 1 2 3)))
 (println! (hash-code (list 1 2 (cons 3 4))))
 )
-)))
-
-(comment
-
-)
+))))
 

@@ -450,18 +450,21 @@ end
 # The intended use for this function is for adding function arguments
 # to the environment. The latter case makes it easy to pass
 # variadic arguments.
-def pairs(cons0, cons1, res = [])
+def pairs(cons0, cons1, expect_vargs = false, res = [])
   if cons0.nil?
     res
   elsif cons1.nil?
     res << Cons.new(first(cons0), nil)
-    pairs(cons0.cdr, nil, res)
+    pairs(cons0.cdr, nil, expect_vargs, res)
+  elsif expect_vargs && cons0.cdr.nil? && cons1.cdr.nil?
+    res << Cons.new(cons0.car, Cons.new(cons1.car, nil))
+    res
   elsif cons0.cdr.nil? && !(cons1.cdr.nil?)
     res << Cons.new(first(cons0), cons1)
     res
   else
     res << Cons.new(first(cons0), first(cons1))
-    pairs(cons0.cdr, cons1.cdr, res)
+    pairs(cons0.cdr, cons1.cdr, expect_vargs, res)
   end
 end
 
@@ -478,6 +481,15 @@ def append(c0, c1)
   else
     Cons.new(first(c0), append(c0.cdr, c1))
   end
+end
+
+def reverse(list)
+  acc = nil
+  until list.nil?
+    acc = Cons.new(first(list), acc)
+    list = rest(list)
+  end
+  acc
 end
 
 # Takes a Cons (list of expressions), calls eval_ly on each element
@@ -565,10 +577,18 @@ def evlambda(args_expr, body_expr, definition_env, ismacro = false)
     # Makes pairs of the argument names and given arguments and
     # adds these pairs to the local environment.
     env1 = nil
+    
+    arg_pairs = nil
+    if max_args < 0
+      arg_pairs = pairs(args_expr, args, true)
+    else
+      arg_pairs = pairs(args_expr, args)
+    end
+    
     if definition_env.__id__ == LYRA_ENV.__id__
-      env1 = LyraEnv.new(LYRA_ENV).add_pairs(pairs(args_expr, args))
+      env1 = LyraEnv.new(LYRA_ENV).add_pairs(arg_pairs)
     else 
-      env1 = LyraEnvPair.new(definition_env, environment).add_pairs(pairs(args_expr, args))
+      env1 = LyraEnvPair.new(definition_env, environment).add_pairs(arg_pairs)
     end
     # Execute all commands in the body and return the last
     # value.
@@ -691,6 +711,7 @@ def eval_ly(expr, env, is_in_call_params=false)
       # Same as define, but the 'ismacro' parameter is true.
       # Form: `(def-macro (name arg0 arg1 ...) body...)`
       evdefine(rest(expr), env, true)
+=begin
     when :apply
       fn = second(expr)
       args = rest(rest(expr))
@@ -699,10 +720,13 @@ def eval_ly(expr, env, is_in_call_params=false)
         args1 = Cons.new(eval_ly(args.car, env), args1)
         args = args.cdr
       end
-      args = eval_list(eval_ly(args.car, env), env)
-      args1 = append(args1, args)
+      last_arg = args.car
+      last_arg = eval_ly(list(:"->list", last_arg), env)
+      args = eval_list(last_arg, env)
+      args1 = append(reverse(args1), args)
       expr = Cons.new(fn, args1)
       eval_ly(expr, env)
+=end
     else
       # Here, the expression will have a form like the following:
       # (func arg0 arg1 ...)
@@ -775,9 +799,12 @@ begin
   ARGV.each do |f|
     evalstr(IO.read(f))
   end
+rescue SystemStackError
+  $stderr.puts "Internal call stack: #{$lyra_call_stack}"
+  raise
 rescue
   $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s
   $stderr.puts "Error: " + $!.message
-  $stderr.puts LYRA_ENV.to_s
+  #$stderr.puts LYRA_ENV.to_s
   #raise
 end

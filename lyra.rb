@@ -271,7 +271,8 @@ def setup_core_functions
       when String       then 5
       when Array        then 6
       when Symbol       then 7
-      else nil
+      when Proc         then 8
+      else raise "Type not registered!"
       end
     end
   end
@@ -433,7 +434,7 @@ def evdefine(expr, env, ismacro)
     body = rest(expr)
 
     # Create the function
-    res = evlambda(args_expr, body, ismacro)
+    res = evlambda(args_expr, body, env, ismacro)
     res.name = name
   else
     # Form is `(define .. ...)` (Variable definition)
@@ -452,7 +453,7 @@ end
 
 # args_expr has the format `(args...)`
 # body_expr has the format `expr...`
-def evlambda(args_expr, body_expr, ismacro = false)
+def evlambda(args_expr, body_expr, definition_env, ismacro = false)
   arg_arr = args_expr.to_a
   arg_count = arg_arr.size
   max_args = arg_count
@@ -480,7 +481,8 @@ def evlambda(args_expr, body_expr, ismacro = false)
   LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
     # Makes pairs of the argument names and given arguments and
     # adds these pairs to the local environment.
-    env1 = append(pairs(args_expr, args), environment)
+    env1 = append(append(pairs(args_expr, args), definition_env), environment)
+    #env1 = append(pairs(args_expr, args), definition_env, environment))
     # Execute all commands in the body and return the last
     # value.
     eval_keep_last(body_expr, env1)
@@ -539,7 +541,7 @@ def eval_ly(expr, env, is_in_call_params=false)
       # If the body is empty, the lambda returns nil.
       args_expr = second(expr)
       body_expr = rest(rest(expr))
-      evlambda(args_expr, body_expr)
+      evlambda(args_expr, body_expr, env)
     when :define
       # Creates a new function and adds it to the global environment.
       # Form: `(define name value)` (For variables)
@@ -601,6 +603,18 @@ def eval_ly(expr, env, is_in_call_params=false)
       # Same as define, but the 'ismacro' parameter is true.
       # Form: `(def-macro (name arg0 arg1 ...) body...)`
       evdefine(rest(expr), env, true)
+    when :apply
+      fn = second(expr)
+      args = rest(rest(expr))
+      args1 = nil
+      while args.cdr
+        args1 = Cons.new(eval_ly(args.car, env), args1)
+        args = args.cdr
+      end
+      args = eval_list(eval_ly(args.car, env), env)
+      args1 = append(args1, args)
+      expr = Cons.new(fn, args1)
+      eval_ly(expr, env)
     else
       # Here, the expression will have a form like the following:
       # (func arg0 arg1 ...)

@@ -26,6 +26,7 @@
 (define string-type (add-lyra-type!))
 (define vector-type (add-lyra-type!))
 (define symbol-type (add-lyra-type!))
+(define function-type (add-lyra-type!))
 
 (define type-match? p=)
 (define (null? e)   (type-match? (lyra-type-id e) nil-type))
@@ -36,6 +37,7 @@
 (define (string? e) (type-match? (lyra-type-id e) string-type))
 (define (vector? e) (type-match? (lyra-type-id e) vector-type))
 (define (symbol? e) (type-match? (lyra-type-id e) symbol-type))
+(define (function? e) (type-match? (lyra-type-id e) function-type))
 
 (add-basics! nil-type    string p=)
 (add-basics! cons-type   string p=)
@@ -45,6 +47,7 @@
 (add-basics! string-type string p=)
 (add-basics! vector-type string p=)
 (add-basics! symbol-type string p=)
+(add-basics! function-type string p=)
 
 ;;;;;
 ;;;;; SECTION Basic operations and operators
@@ -95,6 +98,31 @@
 (define bit-xor p^)
 (define << p<<)
 (define >> p>>)
+
+(comment
+(define (= n & ns)
+  (cfoldl (lambda (x y) (and x (p= n y))) #t ns))
+(define (+ n & ns)
+  (cfoldl (lambda (x y) (p+ x y)) n ns))
+(define (- n & ns)
+  (cfoldl (lambda (x y) (p- x y)) 0 (cons n ns)))
+(define (* n & ns)
+  (cfoldl (lambda (x y) (p* x y)) n ns))
+(define (/ n & ns)
+  (cfoldl (lambda (x y) (p/ x y)) n ns))
+(define (% n & ns)
+  (cfoldl (lambda (x y) (p% x y)) n ns))
+(define (& n & ns)
+  (cfoldl (lambda (x y) (p& x y)) n ns))
+(define (| n & ns)
+  (cfoldl (lambda (x y) (p| x y)) n ns))
+(define (^ n & ns)
+  (cfoldl (lambda (x y) (p^ x y)) n ns))
+(define (<< n & ns)
+  (cfoldl (lambda (x y) (p<< x y)) n ns))
+(define (>> n & ns)
+  (cfoldl (lambda (x y) (p<< x y)) n ns))
+)
 
 (define (<= x y) (or (< x y) (= x y)))
 (define (>= x y) (or (> x y) (= x y)))
@@ -528,11 +556,10 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
-(println! (empty? '()))
-
-(comment
-
-(add-type-function!` cons-type 'fst (lambda (c) (car c)))
+(println! (measure 10
+(lambda ()
+(let* (println! (lambda (x) #t))
+(add-type-function! cons-type 'fst (lambda (c) (car c)))
 (define-method fst c '())
 
 (define-method abcdef type1 (a b c d e f))
@@ -559,7 +586,7 @@
 (let ((v (range 0 99 (vector)))
       (l (vector->list v))
       (predicate (lambda (e) (even? e)))
-      (nruns 100))
+      (nruns 1))
   (println! (filter predicate v))
   (println! (filter predicate l))
   (println! (measure nruns (lambda () (filter predicate v))))
@@ -631,6 +658,10 @@
 (println! (hash-code (vector 1 2 (cons 3 4))))
 (println! (hash-code (list 1 2 3)))
 (println! (hash-code (list 1 2 (cons 3 4))))
+)
+)))
+
+(comment
 
 )
 

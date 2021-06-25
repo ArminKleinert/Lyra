@@ -59,7 +59,7 @@ class LyraEnv
     if v != NOT_FOUND
       v
     else
-      raise "Symbol not found: #{x}" if @parent.nil?
+      raise "Symbol not found: #{sym}" if @parent.nil?
       @parent.find(sym)
     end
   end

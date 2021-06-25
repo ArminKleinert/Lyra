@@ -53,6 +53,9 @@
 ;;;;; SECTION Basic operations and operators
 ;;;;;
 
+(define (id e)
+  e)
+
 ; Boolean and
 (def-macro (and x y)
   (list 'if x y #f))
@@ -290,6 +293,36 @@
             ((f e) e)
             #t res))))
 
+;;; SUBSECT Conversion between lists and vectors.
+
+(define (list->vector ls)
+  (foldl (lambda (v x) (vector-append! v x))
+         (vector) ls))
+
+(define (vector->list v)
+  (let* (iter (lambda (i nl)
+          (if (< i 0)
+            nl
+            (iter (dec i)
+              (cons (vector-get v i) nl)))))
+    (iter (dec (vector-size v)) '())))
+
+;;; SUBSECT: Copying
+
+(define (cpy-list c)
+  (foldr cons '() c))
+
+(define (cpy-vector v)
+  (cpy-vector-range v 0 (dec (vector-size v))))
+
+(define (cleared-vector v)
+  (pvector (lyra-type-id v)))
+
+; Copies a vector and keeps its type-id (if overridden) in place.
+(define (cpy-vector-range v start end)
+  (vector-iterate v (pvector (lyra-type-id v))
+    (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append! acc e)))))
+
 ;;;;;
 ;;;;; SECTION: Defining types with functions.
 ;;;;;
@@ -310,6 +343,9 @@
         'filter filter-list
         'append append-list
         'empty? list-empty?
+        'copy cpy-list
+        '->list id
+        '->vector list->vector
         'find-first list-find-first))
 
 (copy-type-functions! cons-type nil-type)
@@ -328,6 +364,9 @@
         'filter filter-vector
         'append vector-append-multi
         'empty? (lambda (c) (= (vector-size c) 0))
+        'copy cpy-vector
+        '->list vector->list
+        '->vector id
         'find-first vector-find-first))
 
 (define (list-but-last c0)
@@ -372,6 +411,11 @@
 ; Check a sequence for emptyness
 (define-method empty? l '())
 
+
+(define-method copy e '())
+(define-method ->vector c '())
+(define-method ->list c '())
+
 ;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
 
 ; Fold left (General)
@@ -407,23 +451,6 @@
 (define (filter f xs)
   ((get-type-function xs 'filter) f xs))
 
-;;; SUBSECT: Copying
-
-(define (cpy-list c)
-  (foldr cons '() c))
-
-(define (cpy-vector v)
-  (cpy-vector-range v 0 (dec (vector-size v))))
-
-(define (cleared-vector v)
-  (pvector (lyra-type-id v)))
-
-; Copies a vector and keeps its type-id (if overridden) in place.
-
-(define (cpy-vector-range v start end)
-  (vector-iterate v (pvector (lyra-type-id v))
-    (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append! acc e)))))
-
 
 ;;; SUBSECT: Appending lists and vectors
 
@@ -436,20 +463,6 @@
   (foldl
     (lambda (res e) (cons e res))
     '() xs))
-
-;;; SUBSECT Conversion between lists and vectors.
-
-(define (list->vector ls)
-  (foldl (lambda (v x) (vector-append! v x))
-         (vector) ls))
-
-(define (vector->list v)
-  (let* (iter (lambda (i nl)
-          (if (< i 0)
-            nl
-            (iter (dec i)
-              (cons (vector-get v i) nl)))))
-    (iter (dec (vector-size v)) '())))
 
 ; Find first element which matches a predicate p
 (define (find-first p c)
@@ -476,10 +489,6 @@
     (begin
       (f)
       (times (dec n) f))))
-
-; Takes 1 argument and returns it.
-(define (id e)
-  e)
 
 ; Bad, bad, bad
 (define (hash-code-helper e)
@@ -515,8 +524,16 @@
 
 ;(println! (measure 100 (lambda () (range 0 6000 (vector)))))
 
+
 (comment println! (measure 127
 (lambda ()
+(println! (copy     (list 1 2 3 4)))
+(println! (->vector (list 1 2 3 4)))
+(println! (->list   (list 1 2 3 4)))
+(println! (copy     (vector 1 2 3 4)))
+(println! (->vector (vector 1 2 3 4)))
+(println! (->list   (vector 1 2 3 4)))
+
 (let* (println! (lambda (x) #t))
 
 (println! (append-list (list 1) (list 2 3)))

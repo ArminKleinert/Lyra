@@ -47,16 +47,16 @@ class Array
 end
 
 class LyraEnv
-  NOT_FOUND = BasicObject.new
+  @@NOT_FOUND = BasicObject.new
   
-  def initialize(parent, inner = Hash.new(NOT_FOUND))
+  def initialize(parent, inner = Hash.new(@@NOT_FOUND))
     @inner = inner
     @parent = parent
   end
   
   def find(sym)
     v = @inner[sym]
-    if v != NOT_FOUND
+    if v != @@NOT_FOUND
       v
     else
       raise "Symbol not found: #{sym}" if @parent.nil?
@@ -71,11 +71,11 @@ class LyraEnv
   
   def has_key?(sym)
     v = @inner[sym]
-    if v != NOT_FOUND
+    if v != @@NOT_FOUND
       true
     else
       return false if @parent.nil?
-      @parent.has_key[sym]
+      @parent.has_key?(sym)
     end
   end
   
@@ -92,10 +92,6 @@ class LyraEnv
   
   def to_s
     "{variables: #{@inner.to_s}; parent: #{@parent.to_s}}"
-  end
-  
-  def size
-    @inner.size + (@parent.nil? ? 0 : @parent.size)
   end
 end
 
@@ -128,10 +124,6 @@ class LyraEnvPair
   
   def to_s
     "{parent0: #{@e0.to_s}; parent1: #{@e1.to_s}}"
-  end
-  
-  def size
-    @e0.size + @e1.size
   end
 end
 
@@ -421,18 +413,17 @@ def setup_core_functions
                                   t0 = Time.now
                                   second(args).call(nil, env)
                                   t1 = Time.now
-                                  #puts "#{LYRA_ENV.size} #{env.size}"
                                   res << (t1 - t0) * 1000.0
                                 end
                                 median.call(res) }
 
-  add_fn(:"p-hash", 1)           { |args, _| first(args).hash }
+  add_fn(:"p-hash", 1)         { |args, _| first(args).hash }
 
   add_var(:stdin, $stdin)
   add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
   
-  add_fn(:defined?, 1)         { |args, env| begin; true if env.find(args.car); rescue; false; end }
+  add_fn(:defined?, 1)         { |args, env| env.has_key?(args.car) }
 
   true
 end
@@ -677,8 +668,8 @@ def eval_ly(expr, env, is_in_call_params=false)
       # If the body is empty, returns nil.
       name = first(second(expr))
       val = eval_ly(second(second(expr)), env) # Evaluate the value.
-      env1 = LyraEnv.new(env)
-      env1.add(name, val) # Add the value to the environment.
+      env1 = LyraEnv.new env
+      env1.add(name, val)
       eval_keep_last(rest(rest(expr)), env1) # Evaluate the body.
     when :let
       raise "let needs at least 1 argument." if expr.cdr.nil?

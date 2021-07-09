@@ -522,19 +522,11 @@
 
 (define (add e0 e1) (+ e0 e1))
 
-(comment println! (measure 127
+(println! (measure 1
 (lambda ()
 
 
-(let* (println! (lambda (x) #t))
-
-(println! (defined? 'length))
-(println! (defined? 'copy))
-(println! (+ 1))
-(println! (+ 1 2))
-(println! (+ 1 2 3))
-(println! [1 2 3 4])
-(println! [])
+(let* (println! (lambda (x) (to-string x) #t))
 
 (println! (= 1))
 (println! (= 1 1))

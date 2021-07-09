@@ -1,5 +1,6 @@
 ;;;;;
 ;;;;; SECTION File loading
+;;;;;
 
 ; Load, parse and execute a lyra-source file
 (define (load! f)
@@ -39,13 +40,12 @@
 (define (symbol? e) (type-match? (lyra-type-id e) symbol-type))
 (define (function? e) (type-match? (lyra-type-id e) function-type))
 
-(add-basics! nil-type    string p=)
+(add-basics! nil-type    (lambda (e) "()") p=)
 (add-basics! cons-type   string p=)
 (add-basics! int-type    string p=)
 (add-basics! float-type  string p=)
-(add-basics! bool-type   string p=)
+(add-basics! bool-type   (lambda (e) (if e "#t" "#f")) p=)
 (add-basics! string-type string p=)
-(add-basics! vector-type string p=)
 (add-basics! symbol-type string p=)
 (add-basics! function-type string p=)
 
@@ -107,8 +107,8 @@
         ((null? (cdr ns)) (p= n (car ns)))
         (#t (cfoldl (lambda (x y) (and x (p= n y))) #t ns))))
 (define (+ n & ns)
-  (if (empty? (cdr ns))
-    (p+ n (car ns))
+  (if (empty?  ns)
+    n
     (cfoldl (lambda (x y) (p+ x y)) n ns)))
 (define (- n & ns)
   (if (empty? ns)
@@ -328,6 +328,14 @@
   (vector-iterate v (pvector (lyra-type-id v))
     (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append! acc e)))))
 
+(define (vector-to-string v)
+  (let* (last-idx (dec (vector-size v)))
+    (+
+      (vector-iterate v "["
+        (lambda (acc e i)
+          (+ (+ acc (to-string e)) (if (< i last-idx) " " ""))))
+      "]")))
+
 ;;;;;
 ;;;;; SECTION: Defining types with functions.
 ;;;;;
@@ -356,7 +364,8 @@
 (copy-type-functions! cons-type nil-type)
 
 (add-type-functions! vector-type
-  (list 'first (lambda (c) (vector-get c 0))
+  (list '= p=
+        'first (lambda (c) (vector-get c 0))
         'second (lambda (c) (vector-get c 1))
         'third (lambda (c) (vector-get c 2))
         'fourth (lambda (c) (vector-get c 3))
@@ -372,25 +381,13 @@
         'copy cpy-vector
         '->list vector->list
         '->vector id
-        'find-first vector-find-first))
+        'find-first vector-find-first
+        'to-string vector-to-string))
 
 (define (list-but-last c0)
   (cond ((null? c0) '())
         ((null? (cdr c0)) '())
         (#t (cons (car c0) (list-but-last (cdr c0))))))
-
-(def-macro (define-method name type args)
-  (list 'define
-    (append-list
-      (list name type)
-      (cond ((null? args) '())
-            ((cons? args) args)
-            (#t (list args))))
-    (append-list
-      (list (list 'get-type-function type (requote name)))
-      (if args
-        (append-list (list type) args)
-        (list type)))))
 
 (define (first c) ((get-type-function c 'first) c))
 (define (second c) ((get-type-function c 'second) c))
@@ -401,8 +398,6 @@
 (define (fourth c) ((get-type-function c 'fourth) c))
 (define (rest c) ((get-type-function c 'rest) c))
 
-; Get element by index (Cons)
-
 ; Get element by index (General)
 (define (nth xs index)
   ((get-type-function xs 'nth) xs index))
@@ -411,15 +406,16 @@
   ((get-type-function xs 'at) xs key))
 
 ; Length of a sequence
-(define-method length c '())
+(define (length c) ((get-type-function c 'length) c))
 
 ; Check a sequence for emptyness
-(define-method empty? l '())
+(define (empty? c) ((get-type-function c 'empty?) c))
 
+(define (copy c) ((get-type-function c 'copy) c))
 
-(define-method copy e '())
-(define-method ->vector c '())
-(define-method ->list c '())
+(define (->vector c) ((get-type-function c '->vector) c))
+
+(define (->list c) ((get-type-function c '->list) c))
 
 ;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
 
@@ -517,25 +513,28 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
-(println! "Make a video on why you should use tail-recursion over loops.")
-(println! "Also address the good point of using an accumulator outside a loop.")
-
-
+;(println! [1 2 3 4])
 
 (define (range n m acc)
   (if (> n m)
     acc
     (range (inc n) m (vector-append! acc n))))
-(add-type-function! cons-type 'fst (lambda (c) (car c)))
-(define-method fst c '())
 
-(define-method abcdef type1 (a b c d e f))
 (define (add e0 e1) (+ e0 e1))
 
-(println! (measure 127
+(comment println! (measure 127
 (lambda ()
 
+
 (let* (println! (lambda (x) #t))
+
+(println! (defined? 'length))
+(println! (defined? 'copy))
+(println! (+ 1))
+(println! (+ 1 2))
+(println! (+ 1 2 3))
+(println! [1 2 3 4])
+(println! [])
 
 (println! (= 1))
 (println! (= 1 1))
@@ -557,8 +556,6 @@
 
 (println! (append-list (list 1) (list 2 3)))
 (println! (list-but-last (list 1 2 3)))
-
-(println! (fst (list 6 5 4 3)))
 
 (println! (ffirst (list (list (list 9 2) 2) 3 4)))
 (println! (ffirst (vector (vector (vector 99 6) 6) 7 8)))

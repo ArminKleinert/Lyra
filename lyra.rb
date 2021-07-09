@@ -148,7 +148,7 @@ def rest(c); c.cdr; end
 # "(?:\\.|[^\\"])*"? Matches 0 or 1 string
 # ;.* Matches comment and rest or line
 # '?[^\s\[\]{}('"`,;)]* Everything else with an optional ' at the beginning.
-RE = /[\s,]*('\(\)|[()]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
+RE = /[\s,]*([()\[\]]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
 
 # Scan the text using RE, remove empty tokens and remove comments.
 def tokenize(s)
@@ -175,17 +175,24 @@ end
 # a bool, a string becomes a string, etc.
 # If an `(` is found, a cons is opened. It is closed when a `)` is 
 # encountered.
-def make_ast(tokens, level=0)
+def make_ast(tokens, level=0, expected="", stop_after_1=false)
   root = []
   while (t = tokens.shift) != nil
     case t
+    when "'"
+      root << list(:quote, make_ast(tokens, level, "", true))
     when "("
-      root << make_ast(tokens, level+1)
+      root << make_ast(tokens, level+1, ")")
     when ")"
-      raise "Unexpected ')'" if level == 0
+      raise "Unexpected ')'" if level == 0 || expected != ")"
+      return nil if root.size == 0
       return list(*root)
+    when "["
+      root << make_ast(tokens,level,"]").to_a
+    when "]"
+      raise "Unexpected ']'" if level == 0 || expected != "]"
+      return root.to_a
     when '"'                    then raise "Unexpected '\"'"
-    when "'()"                  then root << nil
     when "#t"                   then root << true
     when "#f"                   then root << false
     when /^(0b[0-1]+|-?0x[0-9a-fA-F]+|-?[0-9]+)$/
@@ -218,6 +225,7 @@ def make_ast(tokens, level=0)
         root << t.to_sym
       end
     end
+    return root[0] if stop_after_1
   end
   raise "Expected ')', got EOF" if level != 0
   list(*root)
@@ -423,6 +431,8 @@ def setup_core_functions
   add_var(:stdin, $stdin)
   add_var(:stdout, $stdout)
   add_var(:stderr, $stderr)
+  
+  add_fn(:defined?, 1)         { |args, env| begin; true if env.find(args.car); rescue; false; end }
 
   true
 end

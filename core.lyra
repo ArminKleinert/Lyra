@@ -517,18 +517,10 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
+(println! "Make a video on why you should use tail-recursion over loops.")
+(println! "Also address the good point of using an accumulator outside a loop.")
 
-(comment
-(println! (= 1))
-(println! (= 1 1))
-(println! (= 1 1 1 1))
-(println! (= 1 2 3 4 5 6))
-(println! (+ 1 2))
-(println! (- 1 2 3 4 5 6))
-(println! (- 1))
-(println! (* 1 2 3 4 5 6))
-(println! (/ 1 2 3 4 5 6))
-(println! (% 1 2 3 4 5 6))
+
 
 (define (range n m acc)
   (if (> n m)
@@ -542,14 +534,26 @@
 
 (println! (measure 127
 (lambda ()
+
+(let* (println! (lambda (x) #t))
+
+(println! (= 1))
+(println! (= 1 1))
+(println! (= 1 1 1 1))
+(println! (= 1 2 3 4 5 6))
+(println! (+ 1 2))
+(println! (- 1 2 3 4 5 6))
+(println! (- 1))
+(println! (* 1 2 3 4 5 6))
+(println! (/ 1 2 3 4 5 6))
+(println! (% 1 2 3 4 5 6))
+
 (println! (copy     (list 1 2 3 4)))
 (println! (->vector (list 1 2 3 4)))
 (println! (->list   (list 1 2 3 4)))
 (println! (copy     (vector 1 2 3 4)))
 (println! (->vector (vector 1 2 3 4)))
 (println! (->list   (vector 1 2 3 4)))
-
-(let* (println! (lambda (x) #t))
 
 (println! (append-list (list 1) (list 2 3)))
 (println! (list-but-last (list 1 2 3)))
@@ -640,5 +644,5 @@
 (println! (hash-code (list 1 2 3)))
 (println! (hash-code (list 1 2 (cons 3 4))))
 )
-))))
+)))
 

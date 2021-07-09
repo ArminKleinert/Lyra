@@ -514,7 +514,7 @@ def eval_keep_last(expr_list, env)
     eval_ly(first(expr_list), env)
   else
     # At least 2 expressions left -> Execute the first and recurse
-    eval_ly(first(expr_list), env)
+    eval_ly(first(expr_list), env, true)
     eval_keep_last(rest(expr_list), env)
   end
 end
@@ -711,13 +711,12 @@ def eval_ly(expr, env, is_in_call_params=false)
       # Same as define, but the 'ismacro' parameter is true.
       # Form: `(def-macro (name arg0 arg1 ...) body...)`
       evdefine(rest(expr), env, true)
-=begin
     when :apply
       fn = second(expr)
       args = rest(rest(expr))
       args1 = nil
       while args.cdr
-        args1 = Cons.new(eval_ly(args.car, env), args1)
+        args1 = Cons.new(eval_ly(args.car, env, true), args1)
         args = args.cdr
       end
       last_arg = args.car
@@ -726,7 +725,6 @@ def eval_ly(expr, env, is_in_call_params=false)
       args1 = append(reverse(args1), args)
       expr = Cons.new(fn, args1)
       eval_ly(expr, env)
-=end
     else
       # Here, the expression will have a form like the following:
       # (func arg0 arg1 ...)
@@ -806,5 +804,5 @@ rescue
   $stderr.puts "Internal callstack: " + $lyra_call_stack.to_s
   $stderr.puts "Error: " + $!.message
   #$stderr.puts LYRA_ENV.to_s
-  #raise
+  raise
 end

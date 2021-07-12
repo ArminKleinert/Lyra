@@ -37,6 +37,8 @@ Cons = Struct.new(:car, :cdr) do
   end
 end
 
+Box = Struct.new(:value)
+
 class Array
   def lyra_type_id
     @lyra_type_id
@@ -180,7 +182,7 @@ def make_ast(tokens, level=0, expected="", stop_after_1=false)
       return nil if root.size == 0
       return list(*root)
     when "["
-      root << make_ast(tokens,level,"]").to_a
+      root << list(:vector,  *make_ast(tokens,level,"]"))
     when "]"
       raise "Unexpected ']'" if level == 0 || expected != "]"
       return root.to_a
@@ -328,9 +330,7 @@ def setup_core_functions
   add_fn(:cdr, 1)              { |args, _| first(args).cdr }
   add_fn(:cons, 2)             { |args, _| Cons.new(first(args), second(args)) }
   add_fn(:pcons, 3)            { |args, _| c = Cons.new(first(args), second(args)); c.lyra_type_id = third(args); c }
-  add_fn(:"set-car!", 2)       { |args, _| first(args).car = second(args) }
-  add_fn(:"set-cdr!", 2)       { |args, _| first(args).cdr = second(args) }
-
+  
   add_fn(:pvector, 1, -1)      { |args, _| r = args.cdr.to_a; r.lyra_type_id = args.car; r }
   add_fn(:vector, -1)          { |args, _| args.to_a }
   add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }

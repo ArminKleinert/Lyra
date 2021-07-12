@@ -439,14 +439,6 @@
 (define (map f xs)
   ((get-type-function xs 'map) f xs))
 
-; Like map for conses, but works in place.
-(define (map! f xs)
-  (if (empty? xs)
-    xs
-    (begin
-      (set-car! xs (f (first xs))
-      (map! f (rest xs))))))
-
 ;;; SUBSECT: Filter a list xs by a predicate f.
 
 (define (filter f xs)
@@ -615,7 +607,6 @@
   (println! "")
   (println! l)
   (println! nl)
-  (set-car! nl 15)
   (println! l)
   (println! nl)
   )

@@ -334,8 +334,6 @@ def setup_core_functions
   add_fn(:pvector, 1, -1)      { |args, _| r = args.cdr.to_a; r.lyra_type_id = args.car; r }
   add_fn(:vector, -1)          { |args, _| args.to_a }
   add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }
-  add_fn(:"vector-set!", 3)    { |args, _| first(args)[second(args)] = third(args)
-                                  first(args) }
   add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
                                   first(args) }
   add_fn(:"vector-size", 1)    { |args, _| first(args).size }

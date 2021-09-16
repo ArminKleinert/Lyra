@@ -2,7 +2,7 @@
 
 Lyra is a lisp I make for fun and learning.
 
-Current verssion: 0.8.1
+Current version: 0.8.1
 
 ## Goals and priorities:
 

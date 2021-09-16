@@ -7,7 +7,7 @@ Cons = Struct.new(:car, :cdr) do
     @lyra_type_id = f
   end
   
-  def list_to_s_helper()
+  def list_to_s_helper
     if cdr.nil?
       car.to_s
     elsif cdr.is_a?(Cons)
@@ -18,7 +18,7 @@ Cons = Struct.new(:car, :cdr) do
   end
   
   def to_s
-    "(" + list_to_s_helper() + ")"
+    "(" + list_to_s_helper + ")"
   end
   
   def inspect
@@ -48,17 +48,18 @@ class Array
   end
 end
 
+NOT_FOUND_IN_LYRA_ENV = BasicObject.new
+
 class LyraEnv
-  @@NOT_FOUND = BasicObject.new
   
-  def initialize(parent, inner = Hash.new(@@NOT_FOUND))
+  def initialize(parent, inner = Hash.new(NOT_FOUND_IN_LYRA_ENV))
     @inner = inner
     @parent = parent
   end
   
   def find(sym)
     v = @inner[sym]
-    if v != @@NOT_FOUND
+    if v != NOT_FOUND_IN_LYRA_ENV
       v
     else
       raise "Symbol not found: #{sym}" if @parent.nil?
@@ -73,7 +74,7 @@ class LyraEnv
   
   def has_key?(sym)
     v = @inner[sym]
-    if v != @@NOT_FOUND
+    if v != NOT_FOUND_IN_LYRA_ENV
       true
     else
       return false if @parent.nil?
@@ -142,11 +143,11 @@ def rest(c); c.cdr; end
 # "(?:\\.|[^\\"])*"? Matches 0 or 1 string
 # ;.* Matches comment and rest or line
 # '?[^\s\[\]{}('"`,;)]* Everything else with an optional ' at the beginning.
-RE = /[\s,]*([()\[\]]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
+LYRA_REGEX = /[\s,]*([()\[\]]|"(?:\\.|[^\\"])*"?|;.*|'?[^\s\[\]{}('"`,;)]*)/
 
 # Scan the text using RE, remove empty tokens and remove comments.
 def tokenize(s)
-  s.scan(RE).flatten.reject{|s| s.empty? || s.start_with?(";")}
+  s.scan(LYRA_REGEX).flatten.reject{|w| w.empty? || w.start_with?(";")}
 end
 
 # Creates a list of cons-cells from a Ruby-Array.
@@ -189,8 +190,9 @@ def make_ast(tokens, level=0, expected="", stop_after_1=false)
     when '"'                    then raise "Unexpected '\"'"
     when "#t"                   then root << true
     when "#f"                   then root << false
-    when /^(0b[0-1]+|-?0x[0-9a-fA-F]+|-?[0-9]+)$/
+    when /^(-?0b[0-1]+|-?0x[0-9a-fA-F]+|-?[0-9]+)$/
       mult = 1
+      base = 1
       if t[0] == "-"
         mult = -1
         t = t[1..-1]
@@ -199,12 +201,12 @@ def make_ast(tokens, level=0, expected="", stop_after_1=false)
       case t[0..1]
       when "0x"
         t = t[2..-1]
-        base = 16
+        base *= 16
       when "0b"
         t = t[2..-1]
-        base = 2
+        base *= 2
       else
-        base = 10
+        base *= 10
       end
 
       n = t.to_i(base) * mult
@@ -227,10 +229,10 @@ end
 
 # Get the length of a list. Might be removed in the future.
 def list_len(cons, n=0)
-  unless cons.is_a?(Cons)
-    n
+  if cons.is_a?(Cons)
+    list_len(cons.cdr, n + 1)
   else
-    list_len(cons.cdr, n+1)
+    n
   end
 end
 
@@ -244,7 +246,7 @@ end
 
 # A Lyra-function. It knows its argument-count (minimum and maximum),
 # body (the executable function), name and whether it is a macro or not.
-class LyraFn < Proc
+class LyraFn
   attr_reader :arg_counts # Range of (minimum .. maximum)
   attr_reader :body # Executable
   attr_accessor :name # Symbol
@@ -264,8 +266,8 @@ class LyraFn < Proc
     raise "#{@name}: Too many arguments. (Given #{args_given}, expected #{@arg_counts})" if arg_counts.last >= 0 && args_given > arg_counts.last
     
     begin
-      # Execute the body.
-      r = body.call(args, env)
+      # Execute the body and return
+      body.call(args, env)
     rescue TailCall => tailcall
       unless native?
         # Do a tail-call. (Thanks for providing `retry`, Ruby!)
@@ -277,9 +279,6 @@ class LyraFn < Proc
       $stderr.puts "Arguments: #{args}"
       raise
     end
-    
-    # Return
-    r
   end
   
   def to_s
@@ -334,8 +333,11 @@ def setup_core_functions
   add_fn(:pvector, 1, -1)      { |args, _| r = args.cdr.to_a; r.lyra_type_id = args.car; r }
   add_fn(:vector, -1)          { |args, _| args.to_a }
   add_fn(:"vector-get", 2)     { |args, _| first(args)[second(args)] }
-  add_fn(:"vector-append!", 2) { |args, _| first(args) << second(args)
-                                  first(args) }
+  add_fn(:"vector-set", 3)     { |args, _| arr = first(args).clone; arr[second(args)] = third(args); arr }
+  add_fn(:"vector-append", 2) { |args, _|
+                                other = second(args)
+                                other = [other] unless other.is_a?(Array)
+                                first(args) + other }
   add_fn(:"vector-size", 1)    { |args, _| first(args).size }
   add_fn(:"vector-iterate", 3) { |args, env|
                                accumulator = second(args)
@@ -344,6 +346,10 @@ def setup_core_functions
                                  accumulator = f.call(list(accumulator, e,i), env)
                                end
                                accumulator }
+  
+  add_fn(:"box", 1)            { |args,_| Box.new first(args) }
+  add_fn(:"unbox",1)           {|args,_| first(args).value }
+  add_fn(:"box-set!",2)        { |args,_| first(args).value = second(args); first(args) }
 
   # Returns an integer representing an arbitrary id for the type of the
   # argument. It can be check using (bit-match ..).
@@ -361,7 +367,7 @@ def setup_core_functions
       when String       then 5
       when Array        then 6
       when Symbol       then 7
-      when Proc         then 8
+      when LyraFn       then 8
       else raise "Type not registered!"
       end
     end
@@ -390,7 +396,7 @@ def setup_core_functions
 
   add_fn(:eval!, 1)            { |args, env| eval_keep_last(first(args), env) }
   add_fn(:"call-with-env!", 2) { |args, _| args.car.call(args.cdr.car) }
-  add_fn(:parse, 1)            { |args, env| s = first(args)
+  add_fn(:parse, 1)            { |args, _| s = first(args)
                                   make_ast(tokenize(s)) }
 
   add_fn(:time!, 0)            { |_, _| Time.now.to_f }
@@ -431,7 +437,7 @@ end
 unless Object.const_defined?(:LYRA_ENV)
   LYRA_ENV = LyraEnv.new(nil)
   $lyra_call_stack = nil # Also handled as a cons
-  setup_core_functions()
+  setup_core_functions
 end
 
 # Parses and evaluates a string as Lyra-source code.
@@ -519,10 +525,8 @@ def eval_keep_last(expr_list, env)
 end
 
 # Defines a new function or variable and puts it into the global LYRA_ENV.
-# If `ismacro` is true, the function will not evaluate its arguments right away.
-def evdefine(expr, env, ismacro)
-  name = nil
-  res = nil
+# If `is_macro` is true, the function will not evaluate its arguments right away.
+def ev_define(expr, env, is_macro)
   if first(expr).is_a?(Cons)
     # Form is `(define (...) ...)` (Function definition)
     name = first(first(expr))
@@ -530,7 +534,7 @@ def evdefine(expr, env, ismacro)
     body = rest(expr)
 
     # Create the function
-    res = evlambda(args_expr, body, env, ismacro)
+    res = ev_lambda(args_expr, body, env, is_macro)
     res.name = name
   else
     # Form is `(define .. ...)` (Variable definition)
@@ -547,7 +551,7 @@ end
 
 # args_expr has the format `(args...)`
 # body_expr has the format `expr...`
-def evlambda(args_expr, body_expr, definition_env, ismacro = false)
+def ev_lambda(args_expr, body_expr, definition_env, is_macro = false)
   arg_arr = args_expr.to_a
   arg_count = arg_arr.size
   max_args = arg_count
@@ -572,12 +576,9 @@ def evlambda(args_expr, body_expr, definition_env, ismacro = false)
     end
   end
   
-  LyraFn.new("", ismacro, arg_count, max_args) do |args, environment|
+  LyraFn.new("", is_macro, arg_count, max_args) do |args, environment|
     # Makes pairs of the argument names and given arguments and
     # adds these pairs to the local environment.
-    env1 = nil
-    
-    arg_pairs = nil
     if max_args < 0
       arg_pairs = pairs(args_expr, args, true)
     else
@@ -647,13 +648,13 @@ def eval_ly(expr, env, is_in_call_params=false)
       # If the body is empty, the lambda returns nil.
       args_expr = second(expr)
       body_expr = rest(rest(expr))
-      evlambda(args_expr, body_expr, env)
+      ev_lambda(args_expr, body_expr, env)
     when :define
       # Creates a new function and adds it to the global environment.
       # Form: `(define name value)` (For variables)
       #    or `(define (name arg0 arg1 ...) body...)` (For functions)
       # If the body is empty, the function returns nil.
-      evdefine(rest(expr), env, false)
+      ev_define(rest(expr), env, false)
     when :"let*"
       raise "let* needs at least 1 argument." if expr.cdr.nil?
       raise "let* bindings must be a list." unless second(expr).is_a?(Cons)
@@ -709,7 +710,7 @@ def eval_ly(expr, env, is_in_call_params=false)
     when :"def-macro"
       # Same as define, but the 'ismacro' parameter is true.
       # Form: `(def-macro (name arg0 arg1 ...) body...)`
-      evdefine(rest(expr), env, true)
+      ev_define(rest(expr), env, true)
     when :apply
       fn = second(expr)
       args = rest(rest(expr))

@@ -1,25 +1,28 @@
-(define lyra-types (vector))
+(define lyra-types (box (vector)))
+
 
 (define (add-lyra-type!)
-  (let* (new-id (vector-size lyra-types))
-    (vector-append! lyra-types (vector))
+  (let* (new-id (vector-size (unbox lyra-types)))
+    (box-set! lyra-types (vector-append (unbox lyra-types) [(vector)]))
     new-id))
 
 (define (add-type-function! type-id sym fn)
-  (vector-append! (vector-get lyra-types type-id) (cons sym fn))
+  (let ((all (unbox lyra-types))
+        (inner (vector-append (vector-get all type-id) (cons sym fn))))
+    (box-set! lyra-types (vector-set all type-id inner)))
   sym)
 
 (define (get-type-function e sym)
   (let* (func 
-      (vector-iterate (vector-get lyra-types (lyra-type-id e)) '()
+      (vector-iterate (vector-get (unbox lyra-types) (lyra-type-id e)) '()
       (lambda (res p i)
         (cond ((not (null? res)) res) ; Already found
               ((= (car p) sym) (cdr p)) ; Found
               (#t '()))))) ; Next
     (if (null? func)
-      (sprintln! stderr
-        (+ (+ (+ "INTERNAL ERROR: No function " (string sym)) " for type ")
-          (string (lyra-type-id e))))
+      (sprint! stderr
+        (p+ (p+ (p+ (p+ "INTERNAL ERROR: No function " (string sym)) " for type ")
+          (string (lyra-type-id e))) "\n"))
       '())
     func))
 
@@ -35,10 +38,10 @@
   (add-type-function! type-id '= =fn))
   
 (define (copy-type-functions! from-type-id to-type-id)
-  (let ((v-from (vector-get lyra-types from-type-id))
-        (v-to   (vector-get lyra-types to-type-id)))
-    (vector-iterate v-from v-to
-      (lambda (acc e i) (vector-append! acc e)))))
+  (let ((all-types (unbox lyra-types))
+        (v-from (vector-get all-types from-type-id))
+        (v-to   (vector-get all-types to-type-id)))
+    (box-set! lyra-types (vector-set all-types to-type-id (vector-append v-to v-from)))))
 
 
 

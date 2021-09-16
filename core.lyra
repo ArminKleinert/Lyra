@@ -252,7 +252,7 @@
 (define (map-vector f v)
   (vector-iterate
     v (cleared-vector v)
-    (lambda (acc e i) (vector-append! acc (f e)))))
+    (lambda (acc e i) (vector-append acc (f e)))))
 
 ; map for conses
 (define (map-list f xs)
@@ -262,7 +262,7 @@
 
 (define (filter-vector f v)
   (vector-iterate v (cleared-vector v)
-    (lambda (acc e i) (if (f e) (vector-append! acc e) acc))))
+    (lambda (acc e i) (if (f e) (vector-append acc e) acc))))
     
 (define (filter-list f xs)
   (if (list-empty? xs)
@@ -274,7 +274,7 @@
 ; Appends a vector to another.
 (define (vector-append-multi v0 v1)
   (vector-iterate v1 (cpy-vector v0)
-    (lambda (acc e i) (vector-append! acc e))))
+    (lambda (acc e i) (vector-append acc e))))
 
 ; Appends a list to another.
 ; The complexity depends on the length of the first list.
@@ -301,7 +301,7 @@
 ;;; SUBSECT Conversion between lists and vectors.
 
 (define (list->vector ls)
-  (foldl (lambda (v x) (vector-append! v x))
+  (foldl (lambda (v x) (vector-append v x))
          (vector) ls))
 
 (define (vector->list v)
@@ -326,7 +326,7 @@
 ; Copies a vector and keeps its type-id (if overridden) in place.
 (define (cpy-vector-range v start end)
   (vector-iterate v (pvector (lyra-type-id v))
-    (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append! acc e)))))
+    (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append acc e)))))
 
 (define (vector-to-string v)
   (let* (last-idx (dec (vector-size v)))
@@ -505,16 +505,18 @@
 ;;;;; SECTION : Tests
 ;;;;;
 
-(define (range n m acc)
-  (if (> n m)
-    acc
-    (range (inc n) m (vector-append! acc n))))
+(define (something n l)
+  (if (= n 0)
+    l
+    (something (- n 1) (cons n l))))
 
-(define (add e0 e1) (+ e0 e1))
+(println! something)
 
-(println! [1 2 3 [4 5 6 [7 8 9]]])
+(something 15000 '())
 
-(let ((bigrange (range 0 10 []))
+(println! "HERE")
+
+(comment let ((bigrange (range 0 10 []))
       (biglist (vector->list bigrange)))
 
 (println! (vector bigrange 7 8))
@@ -601,7 +603,7 @@
       (nl (cpy-list l)))
   (println! v)
   (println! nv)
-  (vector-append! nv 1)
+  (vector-append nv 1)
   (println! v)
   (println! nv)
   (println! "")

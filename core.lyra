@@ -315,10 +315,12 @@
 ;;; SUBSECT: Copying
 
 (define (cpy-list c)
-  (foldr cons '() c))
+  ;(foldr cons '() c)
+  c)
 
 (define (cpy-vector v)
-  (cpy-vector-range v 0 (dec (vector-size v))))
+  ;(cpy-vector-range v 0 (dec (vector-size v)))
+  v)
 
 (define (cleared-vector v)
   (pvector (lyra-type-id v)))
@@ -510,22 +512,25 @@
     l
     (something (- n 1) (cons n l))))
 
-(println! something)
+(define (range from to acc)
+  (if (>= from to)
+    acc
+    (range (+ from 1) to (vector-append acc from))))
 
-(something 15000 '())
-
-(println! "HERE")
-
-(comment let ((bigrange (range 0 10 []))
+(let ((bigrange (range 0 50 []))
       (biglist (vector->list bigrange)))
+
+(println! (measure 100
+(lambda ()
+
+(let* (println! (lambda (x) #t))
 
 (println! (vector bigrange 7 8))
 (println! [bigrange 7 8])
 
-(println! (measure 1
-(lambda ()
+(println! something)
+(something 1000 '())
 
-(let* (println! (lambda (x) #t))
 (println! (= 1))
 (println! (= 1 1))
 (println! (= 1 1 1 1))
@@ -573,7 +578,7 @@
 
 ; Test written to measure lookup time for methods...
 
-(println! (add 1 1))
+(println! ((lambda (n m) (+ n m)) 1 1))
 (println! (= 1 1))
 (println! (not (= 1 1)))
 (println! (not= 1 1))

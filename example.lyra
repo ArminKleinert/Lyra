@@ -1,3 +1,0 @@
-(println! 0b1111)
-(println! -0xFF)
-(println! 55)

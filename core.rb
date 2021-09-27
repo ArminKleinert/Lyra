@@ -37,7 +37,7 @@ def setup_core_functions
   add_fn(:"bit-shr", 2) { |x, y| x >> y }
 
   gensym_counter = 0
-  add_fn(:gensym, 0) { "gensym_#{LYRA_VERSION}_#{gensym_counter+=1}".to_sym }
+  add_fn(:gensym, 0) { "gensym_#{LYRA_VERSION}_#{gensym_counter += 1}".to_sym }
   add_fn(:seq, 1) { |x| (!x.is_a?(Enumerable) || x.empty?) ? nil : x.to_cons_list }
 
   add_fn(:"always-true", 0, -1) { |*xs| true }
@@ -111,7 +111,7 @@ def setup_core_functions
   add_fn(:"map-keys", 1) { |m| m.keys }
   add_fn(:"map-merge", 2) { |m, m2| Hash[m].merge!(m2) }
 
-  add_fn(:"println!",1){|x| puts x}
+  add_fn(:"println!", 1) { |x| puts x }
 
   true
 end

@@ -71,11 +71,12 @@ end
 # and return a new list.
 # TODO Potential candidate for optimization?
 def eval_list(expr_list, env)
-  if expr_list.empty?
-    list
-  else
-    List.create(eval_ly(first(expr_list), env, true), eval_list(rest(expr_list), env))
+  l = list
+  until expr_list.empty?
+    l = List.create(eval_ly(first(expr_list),env,true),l)
+    expr_list= rest(expr_list)
   end
+  l
 end
 
 # Similar to eval_list, but only returns the last evaluated value.
@@ -175,6 +176,12 @@ def eval_ly(expr, env, is_in_call_params = false)
     associated(expr, env) # Get associated value from env
   elsif atom?(expr) || expr.is_a?(LyraFn)
     expr
+  elsif expr.is_a? Array
+    if expr.all? { |x| !x.is_a?(Symbol) && atom?(x) }
+      expr
+    else
+      arr.map { |x| eval_ly x, env, true }
+    end
   elsif expr.is_a?(List)
     # The expression is a cons and probably starts with a symbol.
     # The evaluate function will try to treat the symbol as a function

@@ -1,0 +1,643 @@
+;;;;;
+;;;;; SECTION File loading
+;;;;;
+
+; Load, parse and execute a lyra-source file
+(define (load! f)
+  (eval! (parse (slurp! f))))
+
+(define require! load!)
+(define import! load!)
+
+;;;;;
+;;;;; SECTION Important imports
+;;;;;
+
+(load! "type.lyra")
+
+;;;;;
+;;;;; SECTION Type definitions
+;;;;;
+
+(define nil-type    (add-lyra-type!))
+(define cons-type   (add-lyra-type!))
+(define int-type    (add-lyra-type!))
+(define float-type  (add-lyra-type!))
+(define bool-type   (add-lyra-type!))
+(define string-type (add-lyra-type!))
+(define vector-type (add-lyra-type!))
+(define symbol-type (add-lyra-type!))
+(define function-type (add-lyra-type!))
+
+(define type-match? p=)
+(define (null? e)   (type-match? (lyra-type-id e) nil-type))
+(define (cons? e)   (type-match? (lyra-type-id e) cons-type))
+(define (int? e)    (type-match? (lyra-type-id e) int-type))
+(define (float? e)  (type-match? (lyra-type-id e) float-type))
+(define (bool? e)   (type-match? (lyra-type-id e) bool-type))
+(define (string? e) (type-match? (lyra-type-id e) string-type))
+(define (vector? e) (type-match? (lyra-type-id e) vector-type))
+(define (symbol? e) (type-match? (lyra-type-id e) symbol-type))
+(define (function? e) (type-match? (lyra-type-id e) function-type))
+
+(add-basics! nil-type    (lambda (e) "()") p=)
+(add-basics! cons-type   string p=)
+(add-basics! int-type    string p=)
+(add-basics! float-type  string p=)
+(add-basics! bool-type   (lambda (e) (if e "#t" "#f")) p=)
+(add-basics! string-type string p=)
+(add-basics! symbol-type string p=)
+(add-basics! function-type string p=)
+
+;;;;;
+;;;;; SECTION Basic operations and operators
+;;;;;
+
+(define (id e)
+  e)
+
+; Boolean and
+(def-macro (and x y)
+  (list 'if x y #f))
+
+; Boolean or
+(def-macro (or x y)
+  (list 'if x #t y))
+
+; Negate boolean
+(define (not x)
+  (if x #f #t))
+
+; Execute 2 commands in order. The second argument is returned.
+(def-macro (begin e0 e1)
+  (list 'if e0 e1 e1))
+
+; This macro ignores its body and returns nil.
+(def-macro (comment & e)
+  )
+
+(define (atom? e)
+  (and (not (null? e)) (not (cons? e))))
+
+(define (number? e)
+  (or (int? e) (float? e)))
+
+; Operators. These can later be expanded for other types.
+; Maybe we could add conses or vectors or strings together?
+(define = p=)
+(define eq? p=)
+(define eql? p=)
+(define (not= e0 e1) (not (eq? e0 e1)))
+(define < p<)
+(define > p>)
+(define + p+)
+(define - p-)
+(define * p*)
+(define / p/)
+(define % p%)
+(define & p&)
+(define | p|)
+(define ^ p^)
+(define bit-xor p^)
+(define << p<<)
+(define >> p>>)
+
+(define (= n & ns)
+  (cond ((null? ns) #t)
+        ((null? (cdr ns)) (p= n (car ns)))
+        (#t (cfoldl (lambda (x y) (and x (p= n y))) #t ns))))
+(define (+ n & ns)
+  (if (empty?  ns)
+    n
+    (cfoldl (lambda (x y) (p+ x y)) n ns)))
+(define (- n & ns)
+  (if (empty? ns)
+    (p- 0 n)
+    (cfoldl (lambda (x y) (p- x y)) n ns)))
+
+(define (* n & ns)
+  (cfoldl (lambda (x y) (p* x y)) n ns))
+(define (/ n & ns)
+  (cfoldl (lambda (x y) (p/ x y)) n ns))
+(define (% n & ns)
+  (cfoldl (lambda (x y) (p% x y)) n ns))
+(define (& n & ns)
+  (cfoldl (lambda (x y) (p& x y)) n ns))
+(define (| n & ns)
+  (cfoldl (lambda (x y) (p| x y)) n ns))
+(define (^ n & ns)
+  (cfoldl (lambda (x y) (p^ x y)) n ns))
+(define (<< n & ns)
+  (cfoldl (lambda (x y) (p<< x y)) n ns))
+(define (>> n & ns)
+  (cfoldl (lambda (x y) (p<< x y)) n ns))
+
+(define (<= x y) (or (< x y) (= x y)))
+(define (>= x y) (or (> x y) (= x y)))
+
+(define (max n0 n1) (if (> n0 n1) n0 n1))
+(define (min n0 n1) (if (> n0 n1) n1 n0))
+
+(define (abs n) (if (< n 0) (- 0 n) n))
+
+(define (even? n)
+  (= (% n 2) 0))
+
+(define (odd? n)
+  (not= (% n 2) 0))
+
+(define (inc n) (+ n 1))
+(define (dec n) (- n 1))
+
+;;;;;
+;;;;; SECTION String transformation
+;;;;;
+
+; Finds the right string transformation function for the given element
+; and tries to convert it to a string.
+(define (to-string e)
+  (let* (f (get-type-function e 'to-string))
+    ((if f f string) e)))
+
+;;;;;
+;;;;; SECTION Simple IO
+;;;;;
+
+; Read a line from stdin.
+(define (read!)
+  (sread! stdin))
+
+; Prints a string to stdout.
+(define (print! e)
+  (sprint! stdout e to-string))
+
+; Prints a string to stdout followed by a new line.
+(define (println! e)
+  (sprint! stdout e to-string)
+  (sprint! stdout "\n"))
+
+; Prints a string to stdout followed by a new line.
+(define (sprintln! stream e)
+  (sprint! stream e to-string)
+  (sprint! stream "\n"))
+
+; Prints the elements of a list, separated by newlines.
+(define (printall! cs)
+  (if (empty? cs)
+    '()
+    (begin
+      (println! (car cs) to-string)
+      (printall! (cdr cs)))))
+
+;;;;;
+;;;;; SECTION Lists and vectors
+;;;;;
+
+(define nil '())
+
+;;; SUBSECT: Accessors for sequences
+
+; car and cdr variants. Prefer first, second, ... if possible
+(define (caar x)    (car (car x)))
+(define (cadr x)    (car (cdr x)))
+(define (cdar x)    (cdr (car x)))
+(define (cddr x)    (cdr (cdr x)))
+(define (caaar x)   (car (car (car x))))
+(define (caadr x)   (car (car (cdr x))))
+(define (cadar x)   (car (cdr (car x))))
+(define (caddr x)   (car (cdr (cdr x))))
+(define (cdaar x)   (cdr (car (car x))))
+(define (cdadr x)   (cdr (car (cdr x))))
+(define (cddar x)   (cdr (cdr (car x))))
+(define (cdddr x)   (cdr (cdr (cdr x))))
+(define (caaaar x)  (car (car (car (car x)))))
+(define (caaadr x)  (car (car (car (cdr x)))))
+(define (caadar x)  (car (car (cdr (car x)))))
+(define (caaddr x)  (car (car (cdr (cdr x)))))
+(define (cadaar x)  (car (cdr (car (car x)))))
+(define (cadadr x)  (car (cdr (car (cdr x)))))
+(define (caddar x)  (car (cdr (cdr (car x)))))
+(define (cadddr x)  (car (cdr (cdr (cdr x)))))
+(define (cdaaar x)  (cdr (car (car (car x)))))
+(define (cdaadr x)  (cdr (car (car (cdr x)))))
+(define (cdadar x)  (cdr (car (cdr (car x)))))
+(define (cdaddr x)  (cdr (car (cdr (cdr x)))))
+(define (cddaar x)  (cdr (cdr (car (car x)))))
+(define (cddadr x)  (cdr (cdr (car (cdr x)))))
+(define (cdddar x)  (cdr (cdr (cdr (car x)))))
+(define (cddddr x)  (cdr (cdr (cdr (cdr x)))))
+
+(define (list-empty? l) (or (atom? l) (null? l)))
+
+(define (list-nth xs index)
+  (if xs
+    (if (= index 0)
+      (car xs)
+      (list-nth (cdr xs) (- index 1)))
+    '()))
+
+; Fold left (Vector)
+(define (vfoldl f start v)
+  (vector-iterate
+    v start
+    (lambda (acc e i) (f acc e))))
+
+; Fold left (Cons)
+(define (cfoldl f start coll)
+  (if (list-empty? coll)
+    start
+    (cfoldl f (f start (first coll)) (rest coll))))
+
+; map for vectors
+(define (map-vector f v)
+  (vector-iterate
+    v (cleared-vector v)
+    (lambda (acc e i) (vector-append acc (f e)))))
+
+; map for conses
+(define (map-list f xs)
+  (if (list-empty? xs)
+    '()
+    (cons (f (first xs)) (map-list f (rest xs)))))
+
+(define (filter-vector f v)
+  (vector-iterate v (cleared-vector v)
+    (lambda (acc e i) (if (f e) (vector-append acc e) acc))))
+    
+(define (filter-list f xs)
+  (if (list-empty? xs)
+    '()
+    (if (f (car xs))
+      (cons (car xs) (filter-list f (cdr xs)))
+      (filter-list f (cdr xs)))))
+
+; Appends a vector to another.
+(define (vector-append-multi v0 v1)
+  (vector-iterate v1 (cpy-vector v0)
+    (lambda (acc e i) (vector-append acc e))))
+
+; Appends a list to another.
+; The complexity depends on the length of the first list.
+(define (append-list c0 c1)
+  (if (null? c0)
+    c1
+    (cons (car c0) (append-list (cdr c0) c1))))
+
+;;; SUBSECT Searching lists and vectors by predicate
+
+(define (list-find-first f l)
+  (cond ((empty? l) '())
+        ((f (car l)) (car l))
+        (#t (list-find-first f (rest l)))))
+
+; Suboptimal: vector-iterate has no way to stop early.
+(define (vector-find-first f v)
+  (vector-iterate v '()
+    (lambda (res e i)
+      (cond ((not (null? res)) res)
+            ((f e) e)
+            #t res))))
+
+;;; SUBSECT Conversion between lists and vectors.
+
+(define (list->vector ls)
+  (foldl (lambda (v x) (vector-append v x))
+         (vector) ls))
+
+(define (vector->list v)
+  (let* (iter (lambda (i nl)
+          (if (< i 0)
+            nl
+            (iter (dec i)
+              (cons (vector-get v i) nl)))))
+    (iter (dec (vector-size v)) '())))
+
+;;; SUBSECT: Copying
+
+(define (cpy-list c)
+  ;(foldr cons '() c)
+  c)
+
+(define (cpy-vector v)
+  ;(cpy-vector-range v 0 (dec (vector-size v)))
+  v)
+
+(define (cleared-vector v)
+  (pvector (lyra-type-id v)))
+
+; Copies a vector and keeps its type-id (if overridden) in place.
+(define (cpy-vector-range v start end)
+  (vector-iterate v (pvector (lyra-type-id v))
+    (lambda (acc e i) (if (or (< i start) (> i end)) acc (vector-append acc e)))))
+
+(define (vector-to-string v)
+  (let* (last-idx (dec (vector-size v)))
+    (+
+      (vector-iterate v "["
+        (lambda (acc e i)
+          (+ (+ acc (to-string e)) (if (< i last-idx) " " ""))))
+      "]")))
+
+;;;;;
+;;;;; SECTION: Defining types with functions.
+;;;;;
+
+(add-type-functions! cons-type
+  (list 'first car
+        'second cadr
+        'third caddr
+        'fourth cadddr
+        'rest cdr
+        'nth list-nth
+        'at list-nth
+        'length (lambda (c)
+                  (let* (addone (lambda (n m) (inc n)))
+                    (foldl addone 0 c)))
+        'foldl cfoldl
+        'map map-list
+        'filter filter-list
+        'append append-list
+        'empty? list-empty?
+        'copy cpy-list
+        '->list id
+        '->vector list->vector
+        'find-first list-find-first))
+
+(copy-type-functions! cons-type nil-type)
+
+(add-type-functions! vector-type
+  (list '= p=
+        'first (lambda (c) (vector-get c 0))
+        'second (lambda (c) (vector-get c 1))
+        'third (lambda (c) (vector-get c 2))
+        'fourth (lambda (c) (vector-get c 3))
+        'rest (lambda (v) (cpy-vector-range v 1 (dec (vector-size v))))
+        'nth vector-get
+        'at vector-get
+        'length vector-size
+        'foldl vfoldl
+        'map map-vector
+        'filter filter-vector
+        'append vector-append-multi
+        'empty? (lambda (c) (= (vector-size c) 0))
+        'copy cpy-vector
+        '->list vector->list
+        '->vector id
+        'find-first vector-find-first
+        'to-string vector-to-string))
+
+(define (list-but-last c0)
+  (cond ((null? c0) '())
+        ((null? (cdr c0)) '())
+        (#t (cons (car c0) (list-but-last (cdr c0))))))
+
+(define (first c) ((get-type-function c 'first) c))
+(define (second c) ((get-type-function c 'second) c))
+(define (ffirst c) (first (first c)))
+(define (sfirst c) (second (first c)))
+(define (rfirst c) (rest (first c)))
+(define (third c) ((get-type-function c 'third) c))
+(define (fourth c) ((get-type-function c 'fourth) c))
+(define (rest c) ((get-type-function c 'rest) c))
+
+; Get element by index (General)
+(define (nth xs index)
+  ((get-type-function xs 'nth) xs index))
+
+(define (at xs key)
+  ((get-type-function xs 'at) xs key))
+
+; Length of a sequence
+(define (length c) ((get-type-function c 'length) c))
+
+; Check a sequence for emptyness
+(define (empty? c) ((get-type-function c 'empty?) c))
+
+(define (copy c) ((get-type-function c 'copy) c))
+
+(define (->vector c) ((get-type-function c '->vector) c))
+
+(define (->list c) ((get-type-function c '->list) c))
+
+;;; SUBSECT: Fold: Iterate over a sequence and apply an operation.
+
+; Fold left (General)
+(define (foldl f start coll)
+  ((get-type-function coll 'foldl) f start coll))
+
+; Reduce is just an alias for foldl.
+(define reduce foldl)
+
+; Fold right
+(define (foldr f start coll)
+  (if (list-empty? coll)
+    start
+    (f (first coll) (foldr f start (rest coll)))))
+
+;;; SUBSECT: Map (apply a function on each element)
+
+; Executes a function f on each element of a list xs
+; and returns a new list.
+(define (map f xs)
+  ((get-type-function xs 'map) f xs))
+
+;;; SUBSECT: Filter a list xs by a predicate f.
+
+(define (filter f xs)
+  ((get-type-function xs 'filter) f xs))
+
+
+;;; SUBSECT: Appending lists and vectors
+
+(define (append c0 c1)
+  ((get-type-function c0 'append) c0 c1))
+    
+;;; SUBSECT reversal
+    
+(define (reverse xs)
+  (foldl
+    (lambda (res e) (cons e res))
+    '() xs))
+
+; Find first element which matches a predicate p
+(define (find-first p c)
+  ((get-type-function c 'find-first) p c))
+
+(define (associated key c)
+  (if (empty? c)
+    '()
+    (let* (pair (find-first (lambda (e) (= (first e) key)) c))
+      (if pair (cdr pair) '()))))
+
+(define (remove-associations key c)
+  (filter (lambda (e) (not= (first e) key)) c))
+
+;;;;;
+;;;;; SECTION: Utilities
+;;;;;
+
+; Execute a function with no arguments n times. If n is
+; less than 1, the function is still executed at least once.
+(define (times n f)
+  (if (<= n 1)
+    (f)
+    (begin
+      (f)
+      (times (dec n) f))))
+
+; Bad, bad, bad
+(define (hash-code-helper e)
+  (cond ((string? e) (p-hash e))
+         ((number? e) (int e))
+         ((or (cons? e) (vector? e))
+            (foldl
+              (lambda (res n) (* res (hash-code n)))
+              32 e))
+         ((bool? e) (if e 111 -111))
+         ((symbol? e) (+ (<< (p-hash (string e)) 1) 1))
+         (#t 0)))
+
+; Calculate the hash-code of an object.
+(define (hash-code e)
+  (let* (code (hash-code-helper e))
+    ;(bit-xor code (>> code 10))
+    code))
+
+;;;;;
+;;;;; SECTION : Tests
+;;;;;
+
+(define (something n l)
+  (if (= n 0)
+    l
+    (something (- n 1) (cons n l))))
+
+(define (range from to acc)
+  (if (>= from to)
+    acc
+    (range (+ from 1) to (vector-append acc from))))
+
+(let ((bigrange (range 0 50 []))
+      (biglist (vector->list bigrange)))
+
+(println! (measure 100
+(lambda ()
+
+(let* (println! (lambda (x) #t))
+
+(println! (vector bigrange 7 8))
+(println! [bigrange 7 8])
+
+(println! something)
+(something 1000 '())
+
+(println! (= 1))
+(println! (= 1 1))
+(println! (= 1 1 1 1))
+(println! (= 1 2 3 4 5 6))
+(println! (+ 1 2))
+(println! (- 1 2 3 4 5 6))
+(println! (- 1))
+(println! (* 1 2 3 4 5 6))
+(println! (/ 1 2 3 4 5 6))
+(println! (% 1 2 3 4 5 6))
+
+(println! (apply + biglist))
+(println! (apply - biglist))
+(println! (apply * biglist))
+(println! (apply / biglist))
+(println! (apply % biglist))
+
+(println! (copy     biglist))
+(println! (->vector biglist))
+(println! (->list   biglist))
+(println! (copy     bigrange))
+(println! (->vector bigrange))
+(println! (->list   bigrange))
+
+(println! (append-list biglist biglist))
+(println! (list-but-last biglist))
+
+(println! (ffirst (list biglist 3 4)))
+(println! (ffirst (list (list biglist 2) 3 4)))
+(println! (ffirst [bigrange 7 8]))
+(println! (ffirst [[bigrange 6] 7 8]))
+(println! (ffirst [(list 6) 7 8]))
+(println! (length biglist))
+(println! (length bigrange))
+
+(println! (foldl + 0 biglist))
+(println! (foldl + 0 bigrange))
+
+;(let* (predicate (lambda (e) (even? e)))
+(println! (to-string bigrange))
+(println! (to-string biglist))
+(println! (filter even? bigrange))
+(println! (filter even? biglist))
+;)
+
+; Test written to measure lookup time for methods...
+
+(println! ((lambda (n m) (+ n m)) 1 1))
+(println! (= 1 1))
+(println! (not (= 1 1)))
+(println! (not= 1 1))
+(println! "")
+(println! (= 2 1))
+(println! (not (= 2 1)))
+(println! (not= 2 1))
+(println! "")
+(println! (= 1 2))
+(println! (not (= 1 2)))
+(println! (not= 1 2))
+
+(println! (reverse biglist))
+
+(println! (hash-code "abc"))
+(println! (hash-code 'abc))
+(println! (hash-code 198))
+(println! (hash-code 891.0))
+(println! (hash-code biglist))
+(println! (hash-code bigrange))
+(println! (hash-code #t))
+(println! (hash-code #f))
+
+(let ((v bigrange)
+      (nv (cpy-vector v))
+      (l biglist)
+      (nl (cpy-list l)))
+  (println! v)
+  (println! nv)
+  (vector-append nv 1)
+  (println! v)
+  (println! nv)
+  (println! "")
+  (println! l)
+  (println! nl)
+  (println! l)
+  (println! nl)
+  )
+
+(let* (v bigrange)
+  (println! (vector? v))
+  (println! (map-vector inc v))
+  (println! (filter-vector odd? v))
+  (println! (append bigrange bigrange))
+  (println! (rest v))
+  (println! (foldl + 0 v))
+  (println! (even? (vector-get v 1)))
+  (println! (even? (vector-get v 4)))
+  )
+
+(println! (hash-code 8))
+(println! (hash-code "abc"))
+(println! (hash-code '()))
+(println! (hash-code #t))
+(println! (hash-code #f))
+(println! (hash-code bigrange))
+(println! (hash-code [1 2 (cons 3 4)]))
+(println! (hash-code biglist))
+(println! (hash-code (list 1 2 (cons 3 4))))
+)
+))))
+

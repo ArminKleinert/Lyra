@@ -4,6 +4,8 @@ Lyra is a lisp I make for fun and learning.
 
 Current version: 0.8.1
 
+This project has been superseded by Neon Lyra (https://github.com/ArminKleinert/NeonLyra)
+
 ## Goals and priorities:
 
 - The top goal is to finish something simple. The project will be slowly iterated upon.  
@@ -236,8 +238,6 @@ float
 ```
 
 ## Missing features:
-
-Quoted expressions: Currently, the `'` prefix only works on the empty list and symbols. Otherwise `(quote ...)` has to be used.  
 
 A module-system to prevent messing with core-function-names. (Can easily happen when using `define`)  
 

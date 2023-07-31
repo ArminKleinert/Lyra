@@ -1,5 +1,7 @@
 # Lyra
 
+Attention: This repo is opsolete. Take a look at https://github.com/ArminKleinert/NeonLyra instead.
+
 Lyra is a lisp I make for fun and learning.
 
 Current version: 0.8.1
